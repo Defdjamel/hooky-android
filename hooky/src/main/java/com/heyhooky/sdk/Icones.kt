@@ -31,6 +31,11 @@ internal object Icones {
     val externe = trait("externe", "M14 4h6v6M20 4l-9 9", "M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4")
     val gauche = trait("gauche", "M15 18l-6-6 6-6")
     val droite = trait("droite", "M9 18l6-6-6-6")
+    val traduire = trait(
+        "traduire",
+        "M4 5h9M8.5 3v2M11 5c-1 4.5-3.6 7.6-7 9.5M6.5 9c1.3 2.2 3 3.8 5 4.8",
+        "M13 21l4-9 4 9M14.5 17.6h5",
+    )
 
     private fun trait(nom: String, vararg chemins: String): ImageVector =
         ImageVector.Builder(name = nom, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)

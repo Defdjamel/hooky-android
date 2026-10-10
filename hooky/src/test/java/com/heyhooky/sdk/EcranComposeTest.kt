@@ -110,6 +110,51 @@ class EcranComposeTest {
         compose.onNodeWithContentDescription("Ton e-mail").assertIsDisplayed()
     }
 
+    @Test
+    fun `la traduction sous un message de l'équipe, Traduire puis Traduit de l'anglais · Voir l'original`() {
+        val midi = Decodage.date("2026-10-10T12:00:00Z")!!
+        val conversation = Conversation("j", "Lou", null, false, null, null)
+        val anglais = Message(2, Expediteur.EQUIPE, "Sam", "Your order shipped.", emptyList(), midi, langue = "en")
+        val francais = Message(3, Expediteur.EQUIPE, "Sam", "Bonne journée", emptyList(), midi + 60_000, langue = "fr")
+        val textes = Textes("fr")
+        var etat by mutableStateOf(EtatChat(site = site, conversation = conversation, messages = listOf(anglais, francais)))
+        val demandes = mutableListOf<Long>()
+        val actions = object : ActionsFil by actionsVides {
+            override fun traduire(message: Message) {
+                demandes += message.id
+            }
+            override fun basculerOriginal(message: Message) {
+                val t = etat.traductions[message.id] as EtatTraduction.Faite
+                etat = etat.copy(traductions = mapOf(message.id to t.copy(original = !t.original)))
+            }
+        }
+        compose.setContent {
+            HookyTheme(site, textes) {
+                val lignes = MiseEnLignes.lignes(etat, textes, identifie = true, jour = { "" }, heure = { "" },
+                    traduisible = { RegleTraduction.traduisible(it, "fr") })
+                Column { lignes.forEach { LigneFil(it, 280.dp, actions) } }
+            }
+        }
+        // Un seul lien : le message en français n'en a pas.
+        compose.onNodeWithText("Traduire").assertIsDisplayed().performClick()
+        assertEquals(listOf(2L), demandes)
+
+        etat = etat.copy(traductions = mapOf(2L to EtatTraduction.EnCours))
+        compose.onNodeWithText("Traduction…").assertIsDisplayed()
+
+        etat = etat.copy(traductions = mapOf(2L to EtatTraduction.Echec))
+        compose.onNodeWithText("Traduction impossible.").assertIsDisplayed()
+        compose.onNodeWithText("Réessayer").performClick()
+        assertEquals(listOf(2L, 2L), demandes)
+
+        etat = etat.copy(traductions = mapOf(2L to EtatTraduction.Faite("Ta commande est partie.", "en")))
+        compose.onNodeWithText("Ta commande est partie.").assertIsDisplayed()
+        compose.onNodeWithText("Traduit de l’anglais ·").assertIsDisplayed()
+        compose.onNodeWithText("Voir l’original").performClick()
+        compose.onNodeWithText("Your order shipped.").assertIsDisplayed()
+        compose.onNodeWithText("Voir la traduction").assertIsDisplayed()
+    }
+
     private val actionsVides = object : ActionsFil {
         override fun plusAnciens() = Unit
         override fun voirPhotos(pieces: List<PieceJointe>, index: Int) = Unit

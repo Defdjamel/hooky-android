@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,6 +49,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,8 +60,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Le dessin de chaque ligne du fil (voir MiseEnLignes) : les bulles, le
-// jour, l'heure, le message en route, « … écrit », l'accueil.
+// Le dessin de chaque ligne du fil (voir MiseEnLignes) : les bulles (et la
+// ligne de traduction sous celles de l'équipe), le jour, l'heure, le message
+// en route, « … écrit », l'accueil.
 
 private val RAYON = 20.dp
 private val POINTE = 6.dp
@@ -156,6 +160,9 @@ internal interface ActionsFil {
     var prenom: String
     var email: String
     fun versSaisie()
+    // « Traduire » (ou « Réessayer »), « Voir l’original » / « Voir la traduction ».
+    fun traduire(message: Message) = Unit
+    fun basculerOriginal(message: Message) = Unit
 }
 
 @Composable
@@ -185,16 +192,79 @@ private fun MessageFil(ligne: Ligne.Bulle, largeurMax: Dp, actions: ActionsFil) 
             if (ligne.emoji > 0) {
                 Text(message.texte, fontSize = if (ligne.emoji == 1) 48.sp else 38.sp, lineHeight = 52.sp, modifier = Modifier.padding(horizontal = 2.dp))
             } else {
-                BulleTexte(message.texte, visiteur, ligne.fin, largeurMax)
+                // La langue du texte affiché, pour la voix de TalkBack.
+                val traduit = ligne.traduction is EtatTraduction.Faite && !ligne.traduction.original
+                BulleTexte(ligne.texte, visiteur, ligne.fin, largeurMax, langue = if (traduit) LocalTextes.current.langue else message.langue)
+            }
+        }
+        if (ligne.traduisible) LigneTraduction(ligne, actions)
+    }
+}
+
+// Sous un message de l'équipe dans une autre langue : « Traduire »,
+// « Traduction… », l'erreur avec « Réessayer », ou « Traduit de l’anglais ·
+// Voir l’original » (et « Voir la traduction » en retour).
+@Composable
+private fun LigneTraduction(ligne: Ligne.Bulle, actions: ActionsFil) {
+    val palette = LocalPalette.current
+    val textes = LocalTextes.current
+    val message = ligne.message
+    Row(
+        Modifier.padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        when (val traduction = ligne.traduction) {
+            null -> {
+                Icon(Icones.traduire, null, Modifier.size(14.dp), tint = palette.gris)
+                LienTraduction(textes.t("traduire")) { actions.traduire(message) }
+            }
+            EtatTraduction.EnCours -> Text(
+                textes.t("traduction"),
+                color = palette.gris,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 6.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            EtatTraduction.Echec -> {
+                Text(
+                    textes.t("trad_erreur"),
+                    color = palette.erreur,
+                    fontSize = 12.sp,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                LienTraduction(textes.t("reessayer")) { actions.traduire(message) }
+            }
+            is EtatTraduction.Faite -> if (traduction.original) {
+                LienTraduction(textes.t("voir_traduction")) { actions.basculerOriginal(message) }
+            } else {
+                Text(RegleTraduction.traduitDe(traduction.source, textes) + " ·", color = palette.gris, fontSize = 12.sp)
+                LienTraduction(textes.t("voir_original")) { actions.basculerOriginal(message) }
             }
         }
     }
 }
 
+// Un lien discret : gras, souligné, assez haut pour le doigt.
+@Composable
+private fun LienTraduction(texte: String, action: () -> Unit) {
+    val palette = LocalPalette.current
+    Text(
+        texte,
+        color = palette.encre,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(role = Role.Button) { action() }
+            .padding(horizontal = 2.dp, vertical = 6.dp),
+    )
+}
+
 // Une bulle de texte : l'encre pleine pour le visiteur, la carte bordée
 // (ombre dure) pour l'équipe ; la pointe sur le dernier d'une série.
 @Composable
-internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurMax: Dp) {
+internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurMax: Dp, langue: String? = null) {
     val palette = LocalPalette.current
     val forme = if (visiteur) {
         RoundedCornerShape(RAYON, RAYON, if (fin) POINTE else RAYON, RAYON)
@@ -212,12 +282,18 @@ internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurM
         }
     }
     SelectionContainer(fond) {
-        Text(texteAvecLiens(texte), color = couleurTexte, fontSize = 15.sp, lineHeight = 21.sp)
+        Text(texteAvecLiens(texte, langue), color = couleurTexte, fontSize = 15.sp, lineHeight = 21.sp)
     }
 }
 
 // Les adresses web deviennent des liens (soulignés, de la couleur du texte).
-private fun texteAvecLiens(texte: String) = buildAnnotatedString {
+// langue : celle du texte, pour la voix de TalkBack.
+private fun texteAvecLiens(texte: String, langue: String? = null) = buildAnnotatedString {
+    val code = langue?.takeIf { it.isNotBlank() }
+    if (code != null) withStyle(SpanStyle(localeList = LocaleList(code))) { liens(texte) } else liens(texte)
+}
+
+private fun androidx.compose.ui.text.AnnotatedString.Builder.liens(texte: String) {
     var position = 0
     for (lien in MiseEnLignes.liens(texte)) {
         append(texte.substring(position, lien.first))

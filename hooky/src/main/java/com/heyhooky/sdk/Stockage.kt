@@ -6,13 +6,15 @@ import java.util.Properties
 
 // Ce que la bulle garde sur l'appareil, par clé de site : le jeton de la
 // conversation (la seule clé du visiteur), l'identifiant du client donné par
-// identify(userId) avec lui, le brouillon, et le dernier message de l'équipe
-// déjà lu (pour compter les non-lus).
+// identify(userId) avec lui, le brouillon, le dernier message de l'équipe
+// déjà lu (pour compter les non-lus), et « Toujours traduire » (un réglage de
+// l'appareil : effacer() le garde).
 internal interface Stockage {
     var jeton: String?
     var utilisateur: String?
     var brouillon: String?
     var luJusqua: Long
+    var toujoursTraduire: Boolean
     fun effacer()
 }
 
@@ -49,9 +51,15 @@ internal class StockageFichier(dossier: File, cleSite: String) : Stockage {
         get() = lire("lu")?.toLongOrNull() ?: 0
         set(valeur) = ecrire("lu", valeur.toString())
 
+    override var toujoursTraduire: Boolean
+        get() = lire("traduire") == "1"
+        set(valeur) = ecrire("traduire", if (valeur) "1" else null)
+
     override fun effacer() {
+        val traduire = toujoursTraduire
         synchronized(valeurs) { valeurs.clear() }
         fichier.delete()
+        toujoursTraduire = traduire
     }
 
     private fun lire(cle: String): String? = synchronized(valeurs) { valeurs.getProperty(cle) }
@@ -88,6 +96,7 @@ internal class StockageMemoire : Stockage {
     override var utilisateur: String? = null
     override var brouillon: String? = null
     override var luJusqua: Long = 0
+    override var toujoursTraduire: Boolean = false
     override fun effacer() {
         jeton = null
         utilisateur = null

@@ -14,8 +14,20 @@ internal sealed interface Ligne {
     data object Plus : Ligne { override val cle = "plus" }
     data class Jour(val texte: String, override val cle: String) : Ligne
     data class Auteur(val nom: String, override val cle: String) : Ligne
-    data class Bulle(val message: Message, val suite: Boolean, val fin: Boolean, val emoji: Int) : Ligne {
+    // traduisible : un message de l'équipe dans une autre langue (le lien
+    // « Traduire » dessous) ; traduction : où il en est.
+    data class Bulle(
+        val message: Message,
+        val suite: Boolean,
+        val fin: Boolean,
+        val emoji: Int,
+        val traduisible: Boolean = false,
+        val traduction: EtatTraduction? = null,
+    ) : Ligne {
         override val cle = "m" + message.id
+        // Le texte affiché : la traduction, sauf si le visiteur relit l'original.
+        val texte: String
+            get() = (traduction as? EtatTraduction.Faite)?.takeIf { !it.original }?.texte ?: message.texte
     }
     data class Heure(val texte: String, val visiteur: Boolean, override val cle: String) : Ligne
     data class Envoi(val envoi: EnvoiEnCours) : Ligne { override val cle = "envoi" + envoi.debut }
@@ -35,6 +47,7 @@ internal object MiseEnLignes {
         jour: (Long) -> String,
         heure: (Long) -> String,
         aConversation: Boolean = etat.conversation != null,
+        traduisible: (Message) -> Boolean = { false },
     ): List<Ligne> {
         val messages = etat.messages
         val sortie = ArrayList<Ligne>()
@@ -65,7 +78,8 @@ internal object MiseEnLignes {
                 sortie += Ligne.Auteur(message.auteur, "a" + message.id)
             }
             val emoji = if (message.pieces.isEmpty()) nombreEmoji(message.texte) else 0
-            sortie += Ligne.Bulle(message, suite, fin, emoji)
+            val traduire = traduisible(message)
+            sortie += Ligne.Bulle(message, suite, fin, emoji, traduire, if (traduire) etat.traductions[message.id] else null)
             if (fin) {
                 val texte = heure(message.creeLe) + if (message === dernierVisiteur && lu) " · " + textes.t("lu") else ""
                 sortie += Ligne.Heure(texte, message.expediteur == Expediteur.VISITEUR, "h" + message.id)

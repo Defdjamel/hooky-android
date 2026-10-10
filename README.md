@@ -65,7 +65,7 @@ been called, the others do nothing.
 
 | Call | What it does |
 | --- | --- |
-| `Hooky.configure(context, siteKey, apiUrl = Hooky.DEFAULT_API_URL)` | Loads your site's look (name, color, greeting), restores the saved conversation, keeps the realtime connection open while the app is in the foreground. `apiUrl` is only for local tests. |
+| `Hooky.configure(context, siteKey, apiUrl = Hooky.DEFAULT_API_URL, translation = true)` | Loads your site's look (name, color, greeting), restores the saved conversation, keeps the realtime connection open while the app is in the foreground. `apiUrl` is only for local tests; `translation = false` hides the translation of the team's messages. |
 | `Hooky.identify(name, email = null, userId = null, attributes = emptyMap())` | Optional. Who the visitor is (your signed-in user): name, email, your own user id and free data (see [Identify your users](#identify-your-users)). With an email, the bubble skips its name/email form. |
 | `Hooky.setAttributes(attributes)` | Adds free data about the visitor (`mapOf("plan" to "Pro", "cart" to 49.9)`), merged with the previous; `null` removes a key. |
 | `Hooky.open(context)` / `Hooky.close()` | Opens the conversation full screen (an Activity, from any Context) / closes it. |
@@ -140,6 +140,15 @@ Hooky.reset()                                            // when the user signs 
 - The draft survives closing the screen and the app. The keyboard never covers
   the input.
 - Errors in plain words: offline, too many messages, file too large or refused.
+- Translation: when your team writes in another language than the bubble's
+  (the device's), a discreet **Translate** link sits under the message;
+  translated, it reads "Translated from English · See original" (a toggle).
+  The translate button in the header offers **Always translate**, remembered
+  on the device per site key: the team's messages then arrive translated.
+  A failed translation shows a short error with "Try again". The visitor's own
+  messages are never translated. It needs a Hooky server that tells each
+  message's language (with an older one, no link appears); turn it off with
+  `Hooky.configure(context, "YOUR_SITE_KEY", translation = false)`.
 
 ## What the SDK adds to your app
 
@@ -163,8 +172,8 @@ the Android version), and what you pass to `identify` and `setAttributes`.
 Every request carries `X-Hooky-Client: hooky-android/<version>` and
 `X-Hooky-App: <package> <versionName> (<versionCode>)`.
 
-The conversation token (the visitor's only key) and the `userId` given to
-`identify` are stored per site key in a private file of your app under
+The conversation token (the visitor's only key), the `userId` given to
+`identify` and the "Always translate" setting are stored per site key in a private file of your app under
 `noBackupFilesDir`: never backed up to the cloud nor restored on another
 device.
 

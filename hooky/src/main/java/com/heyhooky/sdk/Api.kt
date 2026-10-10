@@ -148,6 +148,17 @@ internal class Api(
         withContext(Dispatchers.IO) { executer(requete).close() }
     }
 
+    // La traduction d'un message de l'équipe vers la langue de la bulle
+    // (gardée par le serveur : la redemander ne coûte rien).
+    suspend fun traduire(jeton: String, message: Long, langue: String): Traduction {
+        val requete = Request.Builder()
+            .url(adresse("v1/widget/conversation/messages/$message/translation"))
+            .header("Authorization", "Bearer $jeton")
+            .post(JSONObject().put("locale", langue).toString().toRequestBody(JSON))
+            .build()
+        return Decodage.traduction(json(requete)) ?: throw ErreurApi(500, "invalid_response")
+    }
+
     // Hooky.track : envoyé sans attendre, une erreur reste muette.
     fun suivre(cleSite: String, nom: String, valeur: Double?, proprietes: Map<String, Any?>) {
         try {

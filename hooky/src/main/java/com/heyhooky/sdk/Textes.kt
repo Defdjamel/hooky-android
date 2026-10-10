@@ -74,7 +74,17 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Aujourd’hui",
                 "hier" to "Hier",
                 "non_lus" to "{n} non lus",
-                "illisible" to "Impossible d’ouvrir ce fichier."
+                "illisible" to "Impossible d’ouvrir ce fichier.",
+                // La traduction des messages de l’équipe.
+                "traduire" to "Traduire",
+                "traduction" to "Traduction…",
+                "traduit_code" to "Traduit ({code})",
+                "voir_original" to "Voir l’original",
+                "voir_traduction" to "Voir la traduction",
+                "trad_erreur" to "Traduction impossible.",
+                "reessayer" to "Réessayer",
+                "toujours" to "Toujours traduire",
+                "options_trad" to "Traduction"
             ),
             "en" to mapOf(
                 "fermer" to "Close chat",
@@ -124,7 +134,16 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Today",
                 "hier" to "Yesterday",
                 "non_lus" to "{n} unread",
-                "illisible" to "This file can’t be opened."
+                "illisible" to "This file can’t be opened.",
+                "traduire" to "Translate",
+                "traduction" to "Translating…",
+                "traduit_code" to "Translated ({code})",
+                "voir_original" to "See original",
+                "voir_traduction" to "See translation",
+                "trad_erreur" to "Couldn’t translate.",
+                "reessayer" to "Try again",
+                "toujours" to "Always translate",
+                "options_trad" to "Translation"
             ),
             "es" to mapOf(
                 "fermer" to "Cerrar el chat",
@@ -174,7 +193,16 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Hoy",
                 "hier" to "Ayer",
                 "non_lus" to "{n} sin leer",
-                "illisible" to "No se puede abrir este archivo."
+                "illisible" to "No se puede abrir este archivo.",
+                "traduire" to "Traducir",
+                "traduction" to "Traduciendo…",
+                "traduit_code" to "Traducido ({code})",
+                "voir_original" to "Ver el original",
+                "voir_traduction" to "Ver la traducción",
+                "trad_erreur" to "No se pudo traducir.",
+                "reessayer" to "Reintentar",
+                "toujours" to "Traducir siempre",
+                "options_trad" to "Traducción"
             ),
             "pt" to mapOf(
                 "fermer" to "Fechar o chat",
@@ -224,7 +252,16 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Hoje",
                 "hier" to "Ontem",
                 "non_lus" to "{n} não lidas",
-                "illisible" to "Não foi possível abrir este arquivo."
+                "illisible" to "Não foi possível abrir este arquivo.",
+                "traduire" to "Traduzir",
+                "traduction" to "Traduzindo…",
+                "traduit_code" to "Traduzido ({code})",
+                "voir_original" to "Ver o original",
+                "voir_traduction" to "Ver a tradução",
+                "trad_erreur" to "Não foi possível traduzir.",
+                "reessayer" to "Tentar de novo",
+                "toujours" to "Traduzir sempre",
+                "options_trad" to "Tradução"
             ),
             "it" to mapOf(
                 "fermer" to "Chiudi la chat",
@@ -274,7 +311,16 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Oggi",
                 "hier" to "Ieri",
                 "non_lus" to "{n} non letti",
-                "illisible" to "Impossibile aprire questo file."
+                "illisible" to "Impossibile aprire questo file.",
+                "traduire" to "Traduci",
+                "traduction" to "Traduzione…",
+                "traduit_code" to "Tradotto ({code})",
+                "voir_original" to "Mostra l’originale",
+                "voir_traduction" to "Mostra la traduzione",
+                "trad_erreur" to "Traduzione non riuscita.",
+                "reessayer" to "Riprova",
+                "toujours" to "Traduci sempre",
+                "options_trad" to "Traduzione"
             ),
             "de" to mapOf(
                 "fermer" to "Chat schließen",
@@ -324,7 +370,16 @@ internal class Textes(val langue: String) {
                 "aujourdhui" to "Heute",
                 "hier" to "Gestern",
                 "non_lus" to "{n} ungelesen",
-                "illisible" to "Diese Datei lässt sich nicht öffnen."
+                "illisible" to "Diese Datei lässt sich nicht öffnen.",
+                "traduire" to "Übersetzen",
+                "traduction" to "Wird übersetzt…",
+                "traduit_code" to "Übersetzt ({code})",
+                "voir_original" to "Original anzeigen",
+                "voir_traduction" to "Übersetzung anzeigen",
+                "trad_erreur" to "Übersetzung fehlgeschlagen.",
+                "reessayer" to "Erneut versuchen",
+                "toujours" to "Immer übersetzen",
+                "options_trad" to "Übersetzung"
             )
         )
     }

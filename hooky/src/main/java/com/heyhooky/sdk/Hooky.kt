@@ -86,14 +86,17 @@ public object Hooky {
      *
      * @param siteKey the public key of your site, from the Hooky dashboard.
      * @param apiUrl the Hooky API, only to change for local tests.
+     * @param translation offers to translate the team's messages written in
+     *   another language than the bubble's (a "Translate" link under them, and
+     *   "Always translate" in the conversation's menu). On by default.
      */
     @JvmStatic
     @JvmOverloads
-    public fun configure(context: Context, siteKey: String, apiUrl: String = DEFAULT_API_URL) {
+    public fun configure(context: Context, siteKey: String, apiUrl: String = DEFAULT_API_URL, translation: Boolean = true) {
         val application = context.applicationContext as Application
         val actuel = moteur
         if (actuel != null) {
-            if (actuel.cleSite == siteKey && actuel.adresseApi == apiUrl.trimEnd('/')) return
+            if (actuel.cleSite == siteKey && actuel.adresseApi == apiUrl.trimEnd('/') && actuel.traductionActive == translation) return
             actuel.premierPlan(false)
             suiviNonLus?.cancel()
             suiviSite?.cancel()
@@ -116,6 +119,7 @@ public object Hooky {
             fuseau = TimeZone.getDefault().id,
             page = "android-app://" + application.packageName,
             appareil = Appareil.actuel(),
+            traductionActive = translation,
         )
         // Avant le démarrage : un autre compte que celui de la conversation
         // enregistrée repart d'une page blanche.

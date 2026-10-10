@@ -46,6 +46,16 @@ internal data class Message(
     val creeLe: Long,
     // Quand ce message (et ses liens) a été reçu de l'API.
     val recuLe: Long = 0,
+    // La langue du texte (« en », « pt-BR »…), absente d'un serveur d'avant
+    // la traduction (alors, pas de bouton « Traduire »).
+    val langue: String? = null,
+)
+
+// POST /v1/widget/conversation/messages/:id/translation : le texte traduit
+// vers la langue de la bulle, et la langue d'origine détectée.
+internal data class Traduction(
+    val texte: String,
+    val source: String?,
 )
 
 // Un fil : la conversation, une page de messages et s'il en reste avant.

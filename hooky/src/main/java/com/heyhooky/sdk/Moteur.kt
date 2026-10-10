@@ -31,6 +31,10 @@ internal data class EtatChat(
     val luParEquipe: Long? = null,
     val erreur: String? = null,
     val chargeAnciens: Boolean = false,
+    // La traduction des messages de l'équipe (voir Traduction.kt) : où en est
+    // chacun, par id, et « Toujours traduire » (gardé par site).
+    val traductions: Map<Long, EtatTraduction> = emptyMap(),
+    val toujoursTraduire: Boolean = false,
 ) {
     // Le message en route est-il déjà arrivé par Action Cable avant la
     // réponse de l'API ? Alors on ne l'affiche pas deux fois.
@@ -63,8 +67,10 @@ internal class Moteur(
     private val appareil: String? = null,
     // Plusieurs changements du profil en moins d'une seconde : un seul PATCH.
     private val delaiProfil: Long = 1_000,
+    // Hooky.configure(translation = false) : ni lien ni menu de traduction.
+    val traductionActive: Boolean = true,
 ) {
-    private val _etat = MutableStateFlow(EtatChat())
+    private val _etat = MutableStateFlow(EtatChat(toujoursTraduire = stockage.toujoursTraduire))
     val etat: StateFlow<EtatChat> = _etat.asStateFlow()
 
     private val _nonLus = MutableStateFlow(0)
@@ -108,6 +114,9 @@ internal class Moteur(
     private var dernierRafraichi = 0L
     private var chargementSite: Job? = null
     private var typingFin: Job? = null
+    // Les traductions à demander, une à la fois.
+    private val fileTraductions = ArrayDeque<Long>()
+    private var traducteur: Job? = null
 
     val cable = Cable(
         client = api.client,
@@ -348,6 +357,104 @@ internal class Moteur(
         }
     }
 
+    // ------------------------------------------------------- traduction --
+
+    // Ce message peut-il se traduire ici ?
+    fun traduisible(message: Message): Boolean =
+        traductionActive && RegleTraduction.traduisible(message, textes.langue)
+
+    // Le menu « Toujours traduire » n'est proposé que s'il sert : un message
+    // de l'équipe dans une autre langue (ou le réglage déjà actif).
+    fun proposeTraduction(etat: EtatChat = _etat.value): Boolean =
+        traductionActive && (etat.toujoursTraduire || etat.messages.any(::traduisible))
+
+    // « Traduire », ou « Réessayer » après une erreur. Déjà en mémoire : aucun appel.
+    fun traduire(message: Message) {
+        if (!traduisible(message)) return
+        when (val actuel = _etat.value.traductions[message.id]) {
+            EtatTraduction.EnCours -> return
+            is EtatTraduction.Faite -> return poserTraductions(mapOf(message.id to actuel.copy(original = false)))
+            else -> Unit
+        }
+        poserTraductions(mapOf(message.id to EtatTraduction.EnCours))
+        enfiler(listOf(message.id))
+    }
+
+    // « Voir l’original » / « Voir la traduction ».
+    fun basculerOriginal(message: Message) {
+        val actuel = _etat.value.traductions[message.id] as? EtatTraduction.Faite ?: return
+        poserTraductions(mapOf(message.id to actuel.copy(original = !actuel.original)))
+    }
+
+    // Activé : les messages déjà traduits passent en traduction (les autres
+    // se traduisent) ; coupé : on relit les originaux.
+    fun toujoursTraduire(actif: Boolean) {
+        stockage.toujoursTraduire = actif
+        _etat.update { e ->
+            e.copy(
+                toujoursTraduire = actif,
+                traductions = e.traductions.mapValues { (_, t) -> if (t is EtatTraduction.Faite) t.copy(original = !actif) else t },
+            )
+        }
+        traduireLesNouveaux()
+    }
+
+    // « Toujours traduire » : chaque message qui peut l'être, une seule fois
+    // (une erreur laisse « Réessayer »), du plus récent au plus ancien.
+    private fun traduireLesNouveaux() {
+        val etat = _etat.value
+        if (!etat.toujoursTraduire || !traductionActive || jeton == null) return
+        val ids = etat.messages.asReversed().filter { traduisible(it) && it.id !in etat.traductions }.map { it.id }
+        if (ids.isEmpty()) return
+        poserTraductions(ids.associateWith { EtatTraduction.EnCours })
+        enfiler(ids)
+    }
+
+    private fun poserTraductions(changements: Map<Long, EtatTraduction?>) {
+        _etat.update { e ->
+            val tout = e.traductions.toMutableMap()
+            changements.forEach { (id, t) -> if (t == null) tout.remove(id) else tout[id] = t }
+            e.copy(traductions = tout)
+        }
+    }
+
+    // Une traduction à la fois : un long fil traduit d'un coup ne doit pas
+    // buter sur la limite du serveur (30 par minute).
+    private fun enfiler(ids: List<Long>) {
+        ids.forEach { if (it !in fileTraductions) fileTraductions.addLast(it) }
+        if (traducteur?.isActive == true) return
+        traducteur = portee.launch {
+            while (fileTraductions.isNotEmpty()) demanderTraduction(fileTraductions.removeFirst())
+        }
+    }
+
+    private suspend fun demanderTraduction(id: Long) {
+        val jeton = jeton
+        val message = _etat.value.messages.firstOrNull { it.id == id }
+        if (jeton == null || message == null || !traduisible(message)) return poserTraductions(mapOf(id to null))
+        try {
+            val traduction = api.traduire(jeton, id, textes.langue)
+            if (jeton != this.jeton) return
+            val source = RegleTraduction.codeCourt(traduction.source ?: message.langue)
+            if (source == RegleTraduction.codeCourt(textes.langue)) {
+                // Le message était déjà dans la langue de la bulle : plus de
+                // lien (le serveur corrige aussi sa langue et le rediffuse).
+                _etat.update { e ->
+                    e.copy(
+                        messages = e.messages.map { if (it.id == id) it.copy(langue = traduction.source) else it },
+                        traductions = e.traductions - id,
+                    )
+                }
+            } else {
+                poserTraductions(mapOf(id to EtatTraduction.Faite(traduction.texte, source)))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            if (jeton == this.jeton) poserTraductions(mapOf(id to EtatTraduction.Echec))
+        }
+    }
+
     // Remonter le fil : la page d'avant le plus ancien message affiché.
     fun plusAnciens() {
         val premier = _etat.value.messages.firstOrNull() ?: return
@@ -437,7 +544,10 @@ internal class Moteur(
         prenomSaisi = ""
         emailSaisi = ""
         stockage.effacer()
-        _etat.update { EtatChat(site = it.site) }
+        traducteur?.cancel()
+        fileTraductions.clear()
+        // « Toujours traduire » est un réglage de l'appareil : il reste.
+        _etat.update { EtatChat(site = it.site, toujoursTraduire = it.toujoursTraduire) }
         _nonLus.value = 0
     }
 
@@ -491,6 +601,7 @@ internal class Moteur(
         }
         compterNonLus()
         marquerLu()
+        traduireLesNouveaux()
     }
 
     private fun compterNonLus() {

@@ -53,7 +53,15 @@ internal object Decodage {
             pieces = if (pieces == null) emptyList() else (0 until pieces.length()).mapNotNull { pieces.optJSONObject(it)?.let(::piece) },
             creeLe = date(json.chaine("created_at")) ?: recuLe,
             recuLe = recuLe,
+            langue = json.chaine("locale")?.takeIf { it.isNotBlank() },
         )
+    }
+
+    // { "translation": { "message_id", "locale", "source_locale", "body" } }.
+    fun traduction(json: JSONObject): Traduction? {
+        val t = json.optJSONObject("translation") ?: return null
+        val texte = t.chaine("body") ?: return null
+        return Traduction(texte = texte, source = t.chaine("source_locale")?.takeIf { it.isNotBlank() })
     }
 
     fun piece(json: JSONObject): PieceJointe? {

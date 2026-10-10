@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,7 +28,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,7 +51,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -187,6 +195,8 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
             override fun versSaisie() {
                 focus.requestFocus()
             }
+            override fun traduire(message: Message) = moteur.traduire(message)
+            override fun basculerOriginal(message: Message) = moteur.basculerOriginal(message)
         }
     }
 
@@ -200,6 +210,7 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
             jour = { jour(it, textes, locale) },
             heure = { SimpleDateFormat(if (format24) "HH:mm" else "h:mm a", locale).format(Date(it)) },
             aConversation = moteur.aConversation,
+            traduisible = moteur::traduisible,
         )
     }
 
@@ -209,6 +220,8 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
             titre = if (enConversation) etat.site?.nom.orEmpty() else textes.t("salut"),
             sousTitre = if (enConversation) textes.t("ici") else etat.site?.nom.orEmpty(),
             fermer = fermer,
+            toujoursTraduire = if (moteur.proposeTraduction(etat)) etat.toujoursTraduire else null,
+            basculerToujours = moteur::toujoursTraduire,
         )
 
         val liste = rememberLazyListState()
@@ -261,9 +274,17 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
 }
 
 // L'en-tête aux couleurs du site : « Salut ! On t'écoute. » avant la
-// conversation, puis le nom du site ; le bouton pour fermer.
+// conversation, puis le nom du site ; le menu de traduction (toujoursTraduire
+// non nul : proposé dès qu'un message de l'équipe est dans une autre
+// langue) ; le bouton pour fermer.
 @Composable
-private fun Entete(titre: String, sousTitre: String, fermer: () -> Unit) {
+private fun Entete(
+    titre: String,
+    sousTitre: String,
+    fermer: () -> Unit,
+    toujoursTraduire: Boolean? = null,
+    basculerToujours: (Boolean) -> Unit = {},
+) {
     val palette = LocalPalette.current
     val textes = LocalTextes.current
     Column(Modifier.fillMaxWidth().background(palette.accent)) {
@@ -291,6 +312,7 @@ private fun Entete(titre: String, sousTitre: String, fermer: () -> Unit) {
                 }
             }
             val forme = RoundedCornerShape(12.dp)
+            if (toujoursTraduire != null) MenuTraduction(toujoursTraduire, basculerToujours)
             Box(
                 Modifier
                     .size(40.dp)
@@ -304,6 +326,65 @@ private fun Entete(titre: String, sousTitre: String, fermer: () -> Unit) {
             }
         }
         Box(Modifier.fillMaxWidth().size(height = TRAIT, width = 0.dp).background(palette.ombre))
+    }
+}
+
+// Le bouton de traduction de l'en-tête et son menu : « Toujours traduire »,
+// un interrupteur (annoncé comme tel par TalkBack).
+@Composable
+private fun MenuTraduction(actif: Boolean, basculer: (Boolean) -> Unit) {
+    val palette = LocalPalette.current
+    val textes = LocalTextes.current
+    var ouvert by remember { mutableStateOf(false) }
+    val forme = RoundedCornerShape(12.dp)
+    Box {
+        Box(
+            Modifier
+                .size(40.dp)
+                .carteDure(forme, palette.carte, palette.trait, palette.ombre, 2.dp)
+                .clip(forme)
+                .clickable(role = Role.Button, onClickLabel = textes.t("options_trad")) { ouvert = true }
+                .semantics { contentDescription = textes.t("options_trad") },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icones.traduire, null, Modifier.size(22.dp), tint = palette.encre)
+        }
+        DropdownMenu(
+            expanded = ouvert,
+            onDismissRequest = { ouvert = false },
+            shape = RoundedCornerShape(18.dp),
+            containerColor = palette.carte,
+            border = BorderStroke(TRAIT, palette.trait),
+            shadowElevation = 0.dp,
+            tonalElevation = 0.dp,
+        ) {
+            DropdownMenuItem(
+                text = { Text(textes.t("toujours"), color = palette.encre, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) },
+                leadingIcon = { Icon(Icones.traduire, null, Modifier.size(20.dp), tint = palette.encre) },
+                trailingIcon = {
+                    Switch(
+                        checked = actif,
+                        onCheckedChange = null,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = palette.carte,
+                            checkedTrackColor = palette.encre,
+                            checkedBorderColor = palette.encre,
+                            uncheckedThumbColor = palette.gris,
+                            uncheckedTrackColor = palette.doux,
+                            uncheckedBorderColor = palette.trait,
+                        ),
+                    )
+                },
+                onClick = {
+                    ouvert = false
+                    basculer(!actif)
+                },
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    role = Role.Switch
+                    toggleableState = ToggleableState(actif)
+                },
+            )
+        }
     }
 }
 
