@@ -223,7 +223,7 @@ private fun LigneTraduction(ligne: Ligne.Bulle, actions: ActionsFil) {
                 textes.t("traduction"),
                 color = palette.gris,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 6.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                modifier = Modifier.padding(vertical = 4.dp).semantics { liveRegion = LiveRegionMode.Polite },
             )
             EtatTraduction.Echec -> {
                 Text(
@@ -257,7 +257,7 @@ private fun LienTraduction(texte: String, action: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .clickable(role = Role.Button) { action() }
-            .padding(horizontal = 2.dp, vertical = 6.dp),
+            .padding(horizontal = 2.dp, vertical = 4.dp),
     )
 }
 
