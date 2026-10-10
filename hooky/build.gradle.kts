@@ -55,9 +55,9 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        // L'API publique est écrite exprès : rien ne fuit par inadvertance.
-        freeCompilerArgs.add("-Xexplicit-api=strict")
     }
+    // L'API publique est écrite exprès : rien ne fuit par inadvertance.
+    explicitApi()
 }
 
 dependencies {
