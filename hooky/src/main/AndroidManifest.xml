@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ce que le SDK ajoute à l'app : Internet, l'écran de conversation, et un
+     FileProvider pour l'appareil photo et l'ouverture des fichiers reçus
+     (rangés dans le cache de l'app, dossier hooky/). Aucune autre permission :
+     l'appareil photo passe par l'app photo du téléphone. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ : voir les apps capables de prendre une photo ou d'ouvrir
+         un PDF, sans lister toutes les apps installées. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/pdf" />
+        </intent>
+    </queries>
+
+    <application>
+        <activity
+            android:name="com.heyhooky.sdk.HookyActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Hooky"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density|fontScale|locale|layoutDirection" />
+
+        <provider
+            android:name="com.heyhooky.sdk.HookyFileProvider"
+            android:authorities="${applicationId}.hooky.fichiers"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/hooky_fichiers" />
+        </provider>
+    </application>
+</manifest>

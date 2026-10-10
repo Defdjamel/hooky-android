@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les fichiers que le SDK partage avec d'autres apps : les photos prises
+     (l'app photo y écrit) et les fichiers reçus à ouvrir ou partager. -->
+<paths>
+    <cache-path name="hooky" path="hooky/" />
+</paths>

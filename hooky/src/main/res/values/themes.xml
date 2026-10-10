@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- L'écran de conversation dessine tout lui-même (Compose, bord à bord) :
+         un thème sans barre d'action, à fond transparent pour l'arrivée en
+         feuille glissée du bas. -->
+    <style name="Theme.Hooky" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowAnimationStyle">@style/Hooky.Animation</item>
+    </style>
+
+    <!-- Comme une feuille modale : monte du bas, redescend à la fermeture. -->
+    <style name="Hooky.Animation" parent="android:Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/hooky_monte</item>
+        <item name="android:activityOpenExitAnimation">@anim/hooky_reste</item>
+        <item name="android:activityCloseEnterAnimation">@anim/hooky_reste</item>
+        <item name="android:activityCloseExitAnimation">@anim/hooky_descend</item>
+    </style>
+</resources>
