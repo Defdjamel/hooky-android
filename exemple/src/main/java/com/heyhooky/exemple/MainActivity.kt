@@ -97,6 +97,25 @@ class MainActivity : ComponentActivity() {
             }, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in as Lou (identify)")
             }
+            // Un compte de l'app : son identifiant et des données libres, vues
+            // par l'équipe sur la fiche de la conversation.
+            Button(onClick = {
+                Hooky.identify(
+                    name = "Lou",
+                    email = "lou@example.com",
+                    userId = "demo-42",
+                    attributes = mapOf("plan" to "Pro", "cart" to 49.9, "beta" to true),
+                )
+                Toast.makeText(this@MainActivity, "Signed in as user demo-42", Toast.LENGTH_SHORT).show()
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign in (identify with userId)")
+            }
+            OutlinedButton(onClick = {
+                Hooky.setAttributes(mapOf("cart" to (10..200).random(), "last_screen" to "Checkout"))
+                Toast.makeText(this@MainActivity, "setAttributes(cart, last_screen)", Toast.LENGTH_SHORT).show()
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text("Update the cart (setAttributes)")
+            }
             OutlinedButton(onClick = {
                 Hooky.track("purchase", 49.0, mapOf("product" to "Linen tote"))
                 Toast.makeText(this@MainActivity, "track(\"purchase\", 49.0)", Toast.LENGTH_SHORT).show()
