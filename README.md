@@ -66,10 +66,11 @@ been called, the others do nothing.
 | Call | What it does |
 | --- | --- |
 | `Hooky.configure(context, siteKey, apiUrl = Hooky.DEFAULT_API_URL)` | Loads your site's look (name, color, greeting), restores the saved conversation, keeps the realtime connection open while the app is in the foreground. `apiUrl` is only for local tests. |
-| `Hooky.identify(name, email = null)` | Optional. Who the visitor is (your signed-in user). Sent when the conversation starts; the bubble then skips its name/email form. |
+| `Hooky.identify(name, email = null, userId = null, attributes = emptyMap())` | Optional. Who the visitor is (your signed-in user): name, email, your own user id and free data (see [Identify your users](#identify-your-users)). With an email, the bubble skips its name/email form. |
+| `Hooky.setAttributes(attributes)` | Adds free data about the visitor (`mapOf("plan" to "Pro", "cart" to 49.9)`), merged with the previous; `null` removes a key. |
 | `Hooky.open(context)` / `Hooky.close()` | Opens the conversation full screen (an Activity, from any Context) / closes it. |
 | `Hooky.track(name, value = null, properties = emptyMap())` | Records an event in your Hooky stats, like `Hooky.track()` on the web: `track("signup")`, `track("order", 49.0, mapOf("plan" to "pro"))`. Failures are silent. |
-| `Hooky.reset()` | Forgets the conversation and the identity. Call it when your user signs out. |
+| `Hooky.reset()` | Forgets the conversation, the identity and the free data. Call it when your user signs out. |
 | `Hooky.unreadCount: StateFlow<Int>` | Team replies the visitor hasn't seen, updated live. Drops to 0 when the conversation is opened. |
 | `Hooky.addUnreadCountListener(listener): Closeable` | The same for Java or View code; close the handle to stop listening. |
 | `Hooky.isConfigured`, `Hooky.VERSION` | Whether `configure` was called; the SDK version. |
@@ -89,7 +90,43 @@ From Java:
 Hooky.configure(this, "YOUR_SITE_KEY");
 Closeable listening = Hooky.addUnreadCountListener(count -> badge.setText(String.valueOf(count)));
 Hooky.track("signup");
+Hooky.identify("Lou", "lou@example.com", "42");             // or with a Map<String, Object> of attributes
 ```
+
+## Identify your users
+
+When your user signs in, tell Hooky who they are. Your team sees it on the
+conversation: name, email, your user id, the device, and the free data.
+
+```kotlin
+Hooky.identify(
+    name = "Lou",
+    email = "lou@example.com",
+    userId = "42",                                       // your own id for this user
+    attributes = mapOf("plan" to "Pro", "cart" to 49.9, "beta" to true),
+)
+
+Hooky.setAttributes(mapOf("cart" to 12, "last_screen" to "Checkout"))   // later, merged
+Hooky.setAttributes(mapOf("beta" to null))                             // removes a key
+
+Hooky.reset()                                            // when the user signs out
+```
+
+- Before the first message, everything is kept in memory (even before
+  `configure`) and sent with it. Once a conversation exists, changes are sent
+  right away, grouped (one request for all the changes made within a second).
+  Nothing throws: offline, they are retried with the next message or when the
+  app comes back to the foreground.
+- `name` and `email` replace the conversation's; `userId = null` leaves it
+  unchanged.
+- The `userId` is stored with the conversation's token. If `identify` gives a
+  **different** `userId`, the conversation is forgotten (like `reset()`):
+  another account on the same device never sees the previous one's thread.
+- Free data: a flat map, up to 50 keys (letters, digits, spaces, `_`, `.`, `-`;
+  64 characters max). Values are strings (500 characters max), numbers or
+  booleans; lists and maps are left out, other objects are sent as text. The
+  server cleans the rest, it never refuses a message for it. The user id is a
+  hint for your team, not verified.
 
 ## What the conversation does
 
@@ -118,15 +155,18 @@ opening the camera.
 
 ## Privacy and data
 
-The SDK sends what the web bubble sends, nothing more: the visitor's messages
-and files, the optional name and email, the device language and time zone,
-and `android-app://<your.package>` as the page. Every request carries
-`X-Hooky-Client: hooky-android/<version>` and
+The SDK sends what the web bubble sends: the visitor's messages and files, the
+optional name and email, the device language and time zone, and
+`android-app://<your.package>` as the page; plus the device, readable
+(`Samsung SM-S918B · Android 15`, from `Build.MANUFACTURER`, `Build.MODEL` and
+the Android version), and what you pass to `identify` and `setAttributes`.
+Every request carries `X-Hooky-Client: hooky-android/<version>` and
 `X-Hooky-App: <package> <versionName> (<versionCode>)`.
 
-The conversation token (the visitor's only key) is stored per site key in a
-private file of your app under `noBackupFilesDir`: it is never backed up to
-the cloud nor restored on another device.
+The conversation token (the visitor's only key) and the `userId` given to
+`identify` are stored per site key in a private file of your app under
+`noBackupFilesDir`: never backed up to the cloud nor restored on another
+device.
 
 ## R8 / ProGuard
 
@@ -142,7 +182,7 @@ sdk/android
 ```
 
 ```sh
-./gradlew :hooky:testDebugUnitTest   # JVM tests: protocol, decoding, storage, reconnection, Compose UI (Robolectric)
+./gradlew :hooky:testDebugUnitTest   # JVM tests: protocol, decoding, storage, reconnection, identify, Compose UI (Robolectric)
 ./gradlew :exemple:installDebug      # sample app on a device or emulator
 ./gradlew :hooky:publishToMavenLocal # com.heyhooky:hooky-android:1.0.0 in ~/.m2
 ```

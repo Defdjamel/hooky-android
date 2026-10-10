@@ -1,5 +1,6 @@
 package com.heyhooky.sdk
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -58,6 +59,10 @@ internal class Moteur(
     private val page: String?,
     reconnexion: Reconnexion = Reconnexion(),
     private val horloge: () -> Long = System::currentTimeMillis,
+    // « Samsung SM-S918B · Android 15 ».
+    private val appareil: String? = null,
+    // Plusieurs changements du profil en moins d'une seconde : un seul PATCH.
+    private val delaiProfil: Long = 1_000,
 ) {
     private val _etat = MutableStateFlow(EtatChat())
     val etat: StateFlow<EtatChat> = _etat.asStateFlow()
@@ -69,6 +74,22 @@ internal class Moteur(
     var nomVisiteur: String? = null
     var emailVisiteur: String? = null
     val identifie: Boolean get() = !nomVisiteur.isNullOrBlank() || !emailVisiteur.isNullOrBlank()
+
+    // identify(userId) et les données libres (setAttributes) : tout part avec
+    // le premier message ; ensuite, ce qui change part par PATCH.
+    var utilisateur: String? = null
+        private set
+    private val _donnees = LinkedHashMap<String, Any>()
+    val donnees: Map<String, Any> get() = _donnees
+
+    // Ce que le serveur ne sait pas encore, et ce qu'il sait déjà (envoyé
+    // pendant cette vie de l'app : un identify répété à chaque lancement ne
+    // part qu'une fois).
+    var profilAEnvoyer = Profil()
+        private set
+    private var profilConnu = Profil()
+    private var envoiProfil: Job? = null
+    private var profilPlanifie = false
 
     // Le brouillon survit à la fermeture de l'écran, et de l'app.
     var brouillon: String = stockage.brouillon.orEmpty()
@@ -94,7 +115,7 @@ internal class Moteur(
         adresse = ::adresseCable,
         surEvenement = ::recevoir,
         surAbonne = ::rattraper,
-        surRefus = ::oublier,
+        surRefus = { oublier() },
         reconnexion = reconnexion,
         horloge = horloge,
     )
@@ -136,6 +157,7 @@ internal class Moteur(
             brancher()
             marquerLu()
             verifierLiens()
+            viderProfil()
         } else {
             cable.fermer()
             stockage.brouillon = brouillon
@@ -167,6 +189,89 @@ internal class Moteur(
         _etat.update { it.copy(erreur = texte) }
     }
 
+    // identify : le prénom et l'e-mail remplacent les précédents (null les
+    // efface ici, pas sur le serveur) ; userId null ne change rien. Rend
+    // vrai si la conversation a été oubliée (un autre compte).
+    fun identifier(nom: String?, email: String?, utilisateur: String? = null, donnees: Map<String, Any?> = emptyMap()): Boolean {
+        val n = nom?.trim()?.takeIf { it.isNotEmpty() }
+        val e = email?.trim()?.takeIf { it.isNotEmpty() }
+        val u = utilisateur?.trim()?.takeIf { it.isNotEmpty() }
+        // Un autre compte sur cet appareil : il ne voit pas le fil du précédent.
+        val avant = stockage.utilisateur
+        val autreCompte = u != null && jeton != null && avant != null && avant != u
+        if (autreCompte) oublier(identite = true)
+        nomVisiteur = n
+        emailVisiteur = e
+        if (u != null) {
+            this.utilisateur = u
+            if (jeton != null) stockage.utilisateur = u
+        }
+        retenir(Profil(n, e, u, Profil.nettoyer(donnees)))
+        return autreCompte
+    }
+
+    // setAttributes : fusionnées avec les précédentes, null supprime.
+    fun ajouterDonnees(donnees: Map<String, Any?>) {
+        retenir(Profil(donnees = Profil.nettoyer(donnees)))
+    }
+
+    // Retenu pour le premier message, et pour le PATCH s'il y a déjà une
+    // conversation (sauf ce que le serveur sait déjà).
+    private fun retenir(changement: Profil) {
+        changement.donnees.forEach { (cle, v) -> if (v == null) _donnees.remove(cle) else _donnees[cle] = v }
+        val connu = profilConnu
+        val neuf = Profil(
+            nom = changement.nom?.takeIf { it != connu.nom },
+            email = changement.email?.takeIf { it != connu.email },
+            utilisateur = changement.utilisateur?.takeIf { it != connu.utilisateur },
+            donnees = changement.donnees.filter { (cle, v) -> !connu.donnees.containsKey(cle) || connu.donnees[cle] != v },
+        )
+        if (neuf.vide) return
+        profilAEnvoyer = profilAEnvoyer.fusion(neuf)
+        planifierProfil()
+    }
+
+    // Un seul PATCH pour les changements d'une même seconde.
+    private fun planifierProfil(delai: Long = delaiProfil) {
+        if (jeton == null || profilAEnvoyer.vide || profilPlanifie) return
+        profilPlanifie = true
+        envoiProfil = portee.launch {
+            if (delai > 0) delay(delai)
+            envoyerProfil()
+        }
+    }
+
+    // Ce qui attend part tout de suite (après un envoi, au retour en ligne).
+    private fun viderProfil() = planifierProfil(0)
+
+    // Jamais d'erreur affichée : hors ligne, on réessaiera au prochain envoi.
+    suspend fun envoyerProfil() {
+        profilPlanifie = false
+        val jeton = jeton ?: return
+        if (profilAEnvoyer.vide) return
+        val envoi = profilAEnvoyer
+        profilAEnvoyer = Profil()
+        try {
+            val conversation = api.modifier(jeton, envoi.json(appareil))
+            if (jeton != this.jeton) return
+            profilConnu = profilConnu.fusion(envoi)
+            _etat.update { e ->
+                e.copy(conversation = e.conversation?.copy(nomVisiteur = conversation.nomVisiteur, emailVisiteur = conversation.emailVisiteur))
+            }
+        } catch (e: ErreurApi) {
+            when {
+                e.statut == 401 -> if (jeton == this.jeton) oublier()
+                // Refusé tel quel (ou un serveur sans cette route : 404, sans
+                // oublier la conversation pour autant) : le renvoyer n'y changerait rien.
+                e.statut in 400..499 && e.statut != 408 && e.statut != 429 -> Unit
+                else -> if (jeton == this.jeton) profilAEnvoyer = envoi.fusion(profilAEnvoyer)
+            }
+        } catch (e: Exception) {
+            if (jeton == this.jeton) profilAEnvoyer = envoi.fusion(profilAEnvoyer)
+            if (e is CancellationException) throw e
+        }
+    }
+
     // Le texte et les fichiers partent ensemble. Rend vrai si c'est parti ;
     // sinon l'erreur est dans l'état et l'écran remet le brouillon.
     suspend fun envoyer(texte: String, fichiers: List<FichierChoisi>, nom: String? = null, email: String? = null): Boolean {
@@ -178,22 +283,37 @@ internal class Moteur(
         val progres: (Float) -> Unit = { part ->
             portee.launch { _etat.update { e -> e.envoi?.let { e.copy(envoi = it.copy(progres = part)) } ?: e } }
         }
+        // Le premier message emporte tout ce que l'app a dit du visiteur ; ce
+        // qui change pendant l'envoi partira ensuite par PATCH.
+        var retenu: Profil? = null
         return try {
             if (premier) {
+                val nomEnvoye = (nom ?: nomVisiteur)?.trim()?.take(100)
+                val emailEnvoye = (email ?: emailVisiteur)?.trim()
+                val compte = utilisateur
+                val extra = LinkedHashMap<String, Any?>(donnees)
+                retenu = profilAEnvoyer
+                profilAEnvoyer = Profil()
                 val fil = api.ouvrir(
                     cleSite = cleSite,
                     texte = propre,
-                    nom = (nom ?: nomVisiteur)?.trim()?.take(100),
-                    email = (email ?: emailVisiteur)?.trim(),
+                    nom = nomEnvoye,
+                    email = emailEnvoye,
                     langue = textes.langue,
                     fuseau = fuseau,
                     page = page,
                     fichiers = envois,
                     progres = progres,
+                    utilisateur = compte,
+                    donnees = extra,
+                    appareil = appareil,
                 )
                 jeton = fil.conversation.jeton
                 stockage.jeton = jeton
+                stockage.utilisateur = compte
                 stockage.luJusqua = fil.messages.filter { it.expediteur == Expediteur.EQUIPE }.maxOfOrNull { it.id } ?: 0
+                profilConnu = Profil(nomEnvoye?.takeIf { it.isNotEmpty() }, emailEnvoye?.takeIf { it.isNotEmpty() }, compte, extra)
+                retenu = null
                 charger(fil, remplacer = true)
                 brancher()
             } else {
@@ -203,8 +323,10 @@ internal class Moteur(
             brouillon = ""
             stockage.brouillon = null
             _etat.update { it.copy(envoi = null) }
+            viderProfil()
             true
         } catch (e: Exception) {
+            retenu?.let { profilAEnvoyer = it.fusion(profilAEnvoyer) }
             if (e is ErreurApi && e.statut == 401) oublier()
             _etat.update { it.copy(envoi = null, erreur = texteErreur(e)) }
             false
@@ -294,11 +416,22 @@ internal class Moteur(
     }
 
     // reset(), ou un jeton qui ne vaut plus rien : on repart d'une page
-    // blanche (le site reste chargé).
-    fun oublier() {
+    // blanche (le site reste chargé). identite : ce que l'app a dit du
+    // visiteur part aussi (reset, un autre compte).
+    fun oublier(identite: Boolean = false) {
         cable.fermer()
         jeton = null
         luEnvoye = null
+        envoiProfil?.cancel()
+        profilPlanifie = false
+        profilAEnvoyer = Profil()
+        profilConnu = Profil()
+        if (identite) {
+            nomVisiteur = null
+            emailVisiteur = null
+            utilisateur = null
+            _donnees.clear()
+        }
         brouillon = ""
         choisis.value = emptyList()
         prenomSaisi = ""
@@ -322,6 +455,8 @@ internal class Moteur(
         try {
             charger(api.fil(jeton), remplacer = false)
             brancher()
+            // De retour en ligne : ce qui n'était pas parti part.
+            viderProfil()
         } catch (e: ErreurApi) {
             if (e.statut == 401) oublier()
         } catch (_: Exception) {

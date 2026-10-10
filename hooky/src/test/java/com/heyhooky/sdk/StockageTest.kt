@@ -20,11 +20,13 @@ class StockageTest {
     fun `le jeton survit à un redémarrage de l'app`() {
         StockageFichier(dossier.root, "pk_site").apply {
             jeton = "abc123"
+            utilisateur = "client-42"
             brouillon = "Bonjour, je"
             luJusqua = 42
         }
         val relu = StockageFichier(dossier.root, "pk_site")
         assertEquals("abc123", relu.jeton)
+        assertEquals("l'identifiant du client est rangé avec le jeton", "client-42", relu.utilisateur)
         assertEquals("Bonjour, je", relu.brouillon)
         assertEquals(42, relu.luJusqua)
     }
@@ -48,10 +50,12 @@ class StockageTest {
     fun `effacer oublie tout (reset)`() {
         val stockage = StockageFichier(dossier.root, "pk_site").apply {
             jeton = "abc"
+            utilisateur = "client-42"
             luJusqua = 3
         }
         stockage.effacer()
         assertNull(stockage.jeton)
+        assertNull(stockage.utilisateur)
         assertEquals(0, stockage.luJusqua)
         assertNull(StockageFichier(dossier.root, "pk_site").jeton)
     }

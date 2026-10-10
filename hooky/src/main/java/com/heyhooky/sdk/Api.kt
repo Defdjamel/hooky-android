@@ -76,7 +76,9 @@ internal class Api(
         return Decodage.site(json(Request.Builder().url(url).get().build()))
     }
 
-    // Le premier message ouvre la conversation et rend son jeton.
+    // Le premier message ouvre la conversation et rend son jeton. Il porte
+    // aussi ce que l'app sait du visiteur : identifiant, données libres
+    // (objet JSON ; en multipart, une chaîne JSON) et appareil.
     suspend fun ouvrir(
         cleSite: String,
         texte: String,
@@ -87,6 +89,9 @@ internal class Api(
         page: String?,
         fichiers: List<FichierAEnvoyer>,
         progres: ((Float) -> Unit)? = null,
+        utilisateur: String? = null,
+        donnees: Map<String, Any?> = emptyMap(),
+        appareil: String? = null,
     ): Fil {
         val champs = linkedMapOf<String, String?>(
             "site_key" to cleSite,
@@ -96,9 +101,24 @@ internal class Api(
             "visitor_email" to email?.takeIf { it.isNotBlank() },
             "locale" to langue,
             "time_zone" to fuseau,
+            "visitor_user_id" to utilisateur?.takeIf { it.isNotBlank() },
+            "visitor_device" to appareil?.takeIf { it.isNotBlank() },
         )
-        val requete = Request.Builder().url(adresse("v1/widget/conversations")).post(corps(champs, fichiers, progres)).build()
+        val objet = donnees.filterValues { it != null }.takeIf { it.isNotEmpty() }?.let { Profil.json(it) }
+        val requete = Request.Builder().url(adresse("v1/widget/conversations")).post(corps(champs, fichiers, progres, objet)).build()
         return Decodage.fil(json(requete))
+    }
+
+    // identify / setAttributes sur une conversation ouverte : seuls les
+    // champs donnés changent, les données libres sont fusionnées par le
+    // serveur. Rend la conversation à jour.
+    suspend fun modifier(jeton: String, champs: JSONObject): Conversation {
+        val requete = Request.Builder()
+            .url(adresse("v1/widget/conversation"))
+            .header("Authorization", "Bearer $jeton")
+            .patch(champs.toString().toRequestBody(JSON))
+            .build()
+        return Decodage.conversation(json(requete).optJSONObject("conversation") ?: JSONObject())
     }
 
     suspend fun envoyer(jeton: String, texte: String, fichiers: List<FichierAEnvoyer>, progres: ((Float) -> Unit)? = null): Message {
@@ -157,14 +177,22 @@ internal class Api(
     private fun adresse(chemin: String): HttpUrl = racine.newBuilder().addPathSegments(chemin).build()
 
     // En JSON sans fichier ; en multipart avec (files[]), avec la progression.
-    private fun corps(champs: Map<String, String?>, fichiers: List<FichierAEnvoyer>, progres: ((Float) -> Unit)?): RequestBody {
+    // Les données libres : un objet en JSON, une chaîne JSON en multipart.
+    private fun corps(
+        champs: Map<String, String?>,
+        fichiers: List<FichierAEnvoyer>,
+        progres: ((Float) -> Unit)?,
+        donnees: JSONObject? = null,
+    ): RequestBody {
         if (fichiers.isEmpty()) {
             val json = JSONObject()
             champs.forEach { (cle, valeur) -> if (valeur != null) json.put(cle, valeur) }
+            if (donnees != null) json.put("visitor_attributes", donnees)
             return json.toString().toRequestBody(JSON)
         }
         val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
         champs.forEach { (cle, valeur) -> if (!valeur.isNullOrEmpty()) multipart.addFormDataPart(cle, valeur) }
+        if (donnees != null) multipart.addFormDataPart("visitor_attributes", donnees.toString())
         fichiers.forEach { fichier ->
             multipart.addFormDataPart("files[]", fichier.nom, CorpsFichier(fichier))
         }
