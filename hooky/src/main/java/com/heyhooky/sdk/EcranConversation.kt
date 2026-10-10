@@ -294,10 +294,8 @@ private fun Entete(titre: String, sousTitre: String, fermer: () -> Unit) {
             Box(
                 Modifier
                     .size(40.dp)
-                    .ombreDure(2.dp, 12.dp, palette.ombre)
+                    .carteDure(forme, palette.carte, palette.trait, palette.ombre, 2.dp)
                     .clip(forme)
-                    .background(palette.carte)
-                    .border(TRAIT, palette.encre, forme)
                     .clickable(role = Role.Button, onClickLabel = textes.t("fermer")) { fermer() }
                     .semantics { contentDescription = textes.t("fermer") },
                 contentAlignment = Alignment.Center,

@@ -81,7 +81,7 @@ internal fun LigneFil(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(palette.carte)
-                    .border(TRAIT, palette.encre, CircleShape)
+                    .border(TRAIT, palette.trait, CircleShape)
                     .clickable(role = Role.Button) { actions.plusAnciens() }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             )
@@ -206,10 +206,8 @@ internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurM
         if (visiteur) {
             it.clip(forme).background(palette.bulleVisiteur).padding(horizontal = 14.dp, vertical = 9.dp)
         } else {
-            it.ombreDure(2.dp, RAYON, palette.ombre)
+            it.carteDure(forme, palette.carte, palette.trait, palette.ombre, 2.dp)
                 .clip(forme)
-                .background(palette.carte)
-                .border(TRAIT, palette.encre, forme)
                 .padding(horizontal = 13.dp, vertical = 8.dp)
         }
     }
@@ -256,7 +254,7 @@ private fun EnvoiFil(envoi: EnvoiEnCours, largeurMax: Dp) {
                                     .weight(1f)
                                     .height(if (images.size == 1) 200.dp else 116.dp)
                                     .clip(RoundedCornerShape(18.dp))
-                                    .border(TRAIT, palette.encre, RoundedCornerShape(18.dp)),
+                                    .border(TRAIT, palette.trait, RoundedCornerShape(18.dp)),
                             )
                         }
                     }
@@ -286,7 +284,7 @@ private fun PointsFrappe() {
         Modifier
             .clip(CircleShape)
             .background(palette.carte)
-            .border(TRAIT, palette.encre, CircleShape)
+            .border(TRAIT, palette.trait, CircleShape)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -313,7 +311,7 @@ private fun CarteAccueil(actions: ActionsFil) {
             .padding(top = 12.dp)
             .clip(forme)
             .background(palette.carte)
-            .border(TRAIT, palette.encre, forme)
+            .border(TRAIT, palette.trait, forme)
             .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -377,10 +375,8 @@ private fun ChampAccueil(
             cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.encre),
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (actif) Modifier.ombreDure(3.dp, 12.dp, palette.ombre) else Modifier)
+                .carteDure(forme, palette.carte, palette.trait, palette.ombre, if (actif) 3.dp else 0.dp)
                 .clip(forme)
-                .background(palette.carte)
-                .border(TRAIT, palette.encre, forme)
                 .onFocusChanged { actif = it.isFocused }
                 .semantics { contentDescription = libelle }
                 .padding(horizontal = 11.dp, vertical = 9.dp),

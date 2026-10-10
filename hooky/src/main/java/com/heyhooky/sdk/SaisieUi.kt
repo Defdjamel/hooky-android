@@ -41,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -95,7 +94,7 @@ internal fun Saisie(
         Modifier
             .fillMaxWidth()
             .background(palette.carte)
-            .drawBehind { drawLine(palette.encre, Offset(0f, trait / 2), Offset(size.width, trait / 2), trait) }
+            .drawBehind { drawLine(palette.trait, Offset(0f, trait / 2), Offset(size.width, trait / 2), trait) }
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .padding(start = 10.dp, end = 10.dp, top = 10.dp),
     ) {
@@ -113,10 +112,8 @@ internal fun Saisie(
         Column(
             Modifier
                 .fillMaxWidth()
-                .then(if (actif) Modifier.ombreDure(3.dp, 22.dp, palette.ombre) else Modifier)
-                .clip(forme)
-                .background(palette.carte)
-                .border(TRAIT, palette.encre, forme),
+                .carteDure(forme, palette.carte, palette.trait, palette.ombre, if (actif) 3.dp else 0.dp)
+                .clip(forme),
         ) {
             if (choisis.isNotEmpty()) {
                 Row(
@@ -137,7 +134,7 @@ internal fun Saisie(
                         onDismissRequest = { menu = false },
                         shape = RoundedCornerShape(18.dp),
                         containerColor = palette.carte,
-                        border = BorderStroke(TRAIT, palette.encre),
+                        border = BorderStroke(TRAIT, palette.trait),
                         shadowElevation = 0.dp,
                         tonalElevation = 0.dp,
                     ) {
@@ -180,15 +177,14 @@ internal fun Saisie(
                     Modifier
                         .padding(start = 2.dp)
                         .size(40.dp)
-                        .alpha(if (peutEnvoyer) 1f else .4f)
+                        // Rien à envoyer : la flèche s'efface sur le gris doux.
+                        .carteDure(RoundedCornerShape(14.dp), if (peutEnvoyer) palette.accent else palette.doux, if (peutEnvoyer) palette.trait else palette.doux, palette.ombre)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(palette.accent)
-                        .border(TRAIT, palette.encre, RoundedCornerShape(14.dp))
                         .clickable(enabled = peutEnvoyer, role = Role.Button, onClickLabel = textes.t("envoyer")) { envoyer() }
                         .semantics { contentDescription = textes.t("envoyer") },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icones.envoyer, null, Modifier.size(22.dp), tint = palette.surAccent)
+                    Icon(Icones.envoyer, null, Modifier.size(22.dp), tint = if (peutEnvoyer) palette.surAccent else palette.placeholder)
                 }
             }
         }
@@ -249,7 +245,7 @@ private fun Apercu(fichier: FichierChoisi, retirer: () -> Unit) {
                 modifier = Modifier
                     .size(64.dp)
                     .clip(forme)
-                    .border(TRAIT, palette.encre, forme),
+                    .border(TRAIT, palette.trait, forme),
             )
         } else {
             Row(
@@ -258,7 +254,7 @@ private fun Apercu(fichier: FichierChoisi, retirer: () -> Unit) {
                     .height(64.dp)
                     .clip(forme)
                     .background(palette.carte)
-                    .border(TRAIT, palette.encre, forme)
+                    .border(TRAIT, palette.trait, forme)
                     .padding(start = 8.dp, end = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

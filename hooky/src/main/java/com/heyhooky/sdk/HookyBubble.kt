@@ -77,10 +77,8 @@ private fun BoutonBulle(nonLus: Int, modifier: Modifier, surClic: () -> Unit) {
             Modifier
                 .offset(decalage, decalage)
                 .size(64.dp)
-                .ombreDure(if (appuye) 2.dp else 4.dp, 22.dp, palette.ombre)
+                .carteDure(forme, palette.accent, palette.trait, palette.ombre, if (appuye) 2.dp else 4.dp)
                 .clip(forme)
-                .background(palette.accent)
-                .border(TRAIT, palette.encre, forme)
                 .clickable(interactionSource = pression, indication = null, role = Role.Button) { surClic() }
                 .semantics { contentDescription = description },
             contentAlignment = Alignment.Center,
@@ -104,9 +102,7 @@ private fun BoutonBulle(nonLus: Int, modifier: Modifier, surClic: () -> Unit) {
                     .align(Alignment.TopEnd)
                     .offset(x = 6.dp + decalage, y = (-6).dp + decalage)
                     .defaultMinSize(minWidth = 24.dp, minHeight = 24.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE5383B))
-                    .border(TRAIT, palette.encre, CircleShape)
+                    .carteDure(CircleShape, Color(0xFFE5383B), palette.trait, palette.ombre)
                     .padding(horizontal = 6.dp, vertical = 4.dp),
             )
         }

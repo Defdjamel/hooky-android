@@ -12,8 +12,10 @@ import kotlin.math.pow
 @Immutable
 internal data class Palette(
     val sombre: Boolean,
-    // Le trait des bordures, le texte, l'ombre dure des cartes.
+    // Le texte ; le trait des bordures (l'encre en clair, un violet gris en
+    // sombre, plus doux que la crème).
     val encre: Color,
+    val trait: Color,
     val gris: Color,
     // Le fond du fil, les cartes (bulles de l'équipe, saisie), le gris doux.
     val fond: Color,
@@ -37,6 +39,7 @@ internal data class Palette(
         fun claire(accent: Color) = Palette(
             sombre = false,
             encre = ENCRE,
+            trait = ENCRE,
             gris = Color(0xFF554D6E),
             fond = Color(0xFFFAF9FF),
             carte = Color.White,
@@ -52,11 +55,12 @@ internal data class Palette(
             surAccent = surAccent(accent),
         )
 
-        // En sombre, l'encre devient la crème : les traits clairs gardent le
-        // dessin de la bulle web, les ombres dures passent au noir.
+        // En sombre, l'encre devient la crème pour le texte ; les traits
+        // passent au violet gris et les ombres dures au noir.
         fun sombre(accent: Color) = Palette(
             sombre = true,
             encre = Color(0xFFF1EDFB),
+            trait = Color(0xFF524A6B),
             gris = Color(0xFFA9A2B6),
             fond = Color(0xFF16131F),
             carte = Color(0xFF221E2E),

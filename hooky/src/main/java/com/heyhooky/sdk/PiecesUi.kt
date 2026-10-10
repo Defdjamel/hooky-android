@@ -90,7 +90,7 @@ internal fun Photos(
         Box(
             modifier
                 .clip(forme)
-                .border(TRAIT, palette.encre, forme)
+                .border(TRAIT, palette.trait, forme)
                 .clickable(role = Role.Image, onClickLabel = textes.t("agrandir", "nom" to piece.nom)) { surToucher(i) }
                 .semantics { contentDescription = textes.t("agrandir", "nom" to piece.nom) },
         ) {
@@ -147,10 +147,8 @@ internal fun CarteFichier(
     Row(
         Modifier
             .width(236.dp)
-            .ombreDure(2.dp, 16.dp, palette.ombre)
+            .carteDure(forme, palette.carte, palette.trait, palette.ombre, 2.dp)
             .clip(forme)
-            .background(palette.carte)
-            .border(TRAIT, palette.encre, forme)
             .then(
                 if (surOuvrir != null) {
                     Modifier.clickable(role = Role.Button, onClickLabel = textes.t("ouvrir_fichier", "nom" to nom)) { surOuvrir() }
