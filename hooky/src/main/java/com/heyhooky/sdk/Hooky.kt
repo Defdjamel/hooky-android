@@ -216,7 +216,10 @@ public object Hooky {
     private fun surveillerPremierPlan(application: Application) {
         if (cycleDeVie != null) return
         val rappels = object : Application.ActivityLifecycleCallbacks {
-            private var demarrees = if (auPremierPlan()) 1 else 0
+            // On part de zéro même si l'app est déjà au premier plan (configure
+            // dans Application.onCreate) : l'activité qui démarre sera comptée,
+            // et une activité déjà démarrée qui s'arrête ramène à zéro.
+            private var demarrees = 0
 
             override fun onActivityStarted(activity: Activity) {
                 demarrees++

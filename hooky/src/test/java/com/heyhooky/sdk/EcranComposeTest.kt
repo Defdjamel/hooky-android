@@ -1,0 +1,123 @@
+package com.heyhooky.sdk
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+
+// L'interface Compose, rendue sur la JVM par Robolectric (aucun APK de test à
+// installer sur un appareil) : la saisie et le fil, avec les textes et les
+// descriptions qu'entend TalkBack.
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [35])
+class EcranComposeTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    private val site = Site("Atelier Gecko", "#FF5B3A", "right", "Une question ?")
+
+    @Test
+    fun `la flèche d'envoi ne s'active qu'avec un texte, et envoie`() {
+        var envois = 0
+        compose.setContent {
+            HookyTheme(site, Textes("en")) {
+                var valeur by remember { mutableStateOf(TextFieldValue("")) }
+                Saisie(
+                    valeur = valeur,
+                    surChangement = { valeur = it },
+                    choisis = emptyList(),
+                    retirer = {},
+                    erreur = null,
+                    occupe = false,
+                    envoyer = { envois++ },
+                    joindre = {},
+                    focus = remember { FocusRequester() },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Send").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Your message").performTextInput("Bonjour")
+        compose.onNodeWithContentDescription("Send").assertIsEnabled().performClick()
+        assertEquals(1, envois)
+        compose.onNodeWithText("Powered by hooky").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Attach a photo or a PDF").assertIsDisplayed()
+    }
+
+    @Test
+    fun `une erreur de l'API s'affiche au-dessus de la saisie`() {
+        compose.setContent {
+            HookyTheme(site, Textes("fr")) {
+                Saisie(TextFieldValue(""), {}, emptyList(), {}, Textes("fr").t("lourd_api"), false, {}, {}, remember { FocusRequester() })
+            }
+        }
+        compose.onNodeWithText("Un fichier est trop lourd : 10 Mo au plus.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `le fil, l'auteur, les messages, le lien, « Lu » et « … écrit »`() {
+        val midi = Decodage.date("2026-10-10T12:00:00Z")!!
+        val conversation = Conversation("j", "Lou", null, false, null, null)
+        val messages = listOf(
+            Message(1, Expediteur.VISITEUR, "Lou", "Mon colis est arrivé abîmé", emptyList(), midi),
+            Message(2, Expediteur.EQUIPE, "Camille", "Désolée ! Le retour : https://exemple.fr/retours", emptyList(), midi + 60_000),
+            Message(3, Expediteur.VISITEUR, "Lou", "Merci !", emptyList(), midi + 120_000),
+        )
+        val etat = EtatChat(site = site, conversation = conversation, messages = messages, luParEquipe = midi + 180_000, equipeEcrit = "Camille")
+        val textes = Textes("fr")
+        val lignes = MiseEnLignes.lignes(etat, textes, identifie = false, jour = { "Aujourd’hui" }, heure = { "12:00" })
+        compose.setContent {
+            HookyTheme(site, textes) {
+                Column { lignes.forEach { LigneFil(it, 280.dp, actionsVides) } }
+            }
+        }
+        compose.onNodeWithText("Aujourd’hui").assertIsDisplayed()
+        compose.onNodeWithText("Camille").assertIsDisplayed()
+        compose.onNodeWithText("Mon colis est arrivé abîmé").assertIsDisplayed()
+        compose.onNodeWithText("Désolée ! Le retour : https://exemple.fr/retours").assertIsDisplayed()
+        compose.onNodeWithText("12:00 · Lu").assertIsDisplayed()
+        compose.onNodeWithText("Camille écrit…").assertIsDisplayed()
+    }
+
+    @Test
+    fun `avant la conversation, l'accueil du site et le formulaire`() {
+        val textes = Textes("fr")
+        val lignes = MiseEnLignes.lignes(EtatChat(site = site), textes, identifie = false, jour = { "" }, heure = { "" })
+        compose.setContent {
+            HookyTheme(site, textes) {
+                Column { lignes.forEach { LigneFil(it, 280.dp, actionsVides) } }
+            }
+        }
+        compose.onNodeWithText("Une question ?").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Ton prénom").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Ton e-mail").assertIsDisplayed()
+    }
+
+    private val actionsVides = object : ActionsFil {
+        override fun plusAnciens() = Unit
+        override fun voirPhotos(pieces: List<PieceJointe>, index: Int) = Unit
+        override fun ouvrirFichier(piece: PieceJointe, partager: Boolean) = Unit
+        override fun fichierOccupe(piece: PieceJointe) = false
+        override fun liensExpires() = Unit
+        override var prenom: String = ""
+        override var email: String = ""
+        override fun versSaisie() = Unit
+    }
+}

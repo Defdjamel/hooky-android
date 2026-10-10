@@ -43,6 +43,8 @@ android {
         // Les classes d'Android (Log, Uri…) appelées par mégarde dans un test
         // JVM rendent une valeur par défaut au lieu de lever.
         unitTests.isReturnDefaultValues = true
+        // Robolectric (les tests Compose sur la JVM) lit les ressources.
+        unitTests.isIncludeAndroidResources = true
     }
 
     publishing {
@@ -82,12 +84,12 @@ dependencies {
     testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
-
-    // Tests sur l'appareil : l'écran de conversation en Compose.
-    androidTestImplementation(libs.androidx.test.junit)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // L'interface Compose testée sur la JVM, sans appareil.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    // Le manifeste d'activité vide qu'il faut aux tests Compose.
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
