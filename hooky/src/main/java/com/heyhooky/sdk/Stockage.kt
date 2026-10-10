@@ -5,10 +5,12 @@ import java.security.MessageDigest
 import java.util.Properties
 
 // Ce que la bulle garde sur l'appareil, par clé de site : le jeton de la
-// conversation (la seule clé du visiteur), le brouillon, et le dernier
-// message de l'équipe déjà lu (pour compter les non-lus).
+// conversation (la seule clé du visiteur), l'identifiant du client donné par
+// identify(userId) avec lui, le brouillon, et le dernier message de l'équipe
+// déjà lu (pour compter les non-lus).
 internal interface Stockage {
     var jeton: String?
+    var utilisateur: String?
     var brouillon: String?
     var luJusqua: Long
     fun effacer()
@@ -34,6 +36,10 @@ internal class StockageFichier(dossier: File, cleSite: String) : Stockage {
     override var jeton: String?
         get() = lire("jeton")
         set(valeur) = ecrire("jeton", valeur)
+
+    override var utilisateur: String?
+        get() = lire("utilisateur")
+        set(valeur) = ecrire("utilisateur", valeur?.takeIf { it.isNotEmpty() })
 
     override var brouillon: String?
         get() = lire("brouillon")
@@ -79,10 +85,12 @@ internal class StockageFichier(dossier: File, cleSite: String) : Stockage {
 // Pour les tests, et en secours si le disque est inaccessible.
 internal class StockageMemoire : Stockage {
     override var jeton: String? = null
+    override var utilisateur: String? = null
     override var brouillon: String? = null
     override var luJusqua: Long = 0
     override fun effacer() {
         jeton = null
+        utilisateur = null
         brouillon = null
         luJusqua = 0
     }

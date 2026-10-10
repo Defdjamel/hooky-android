@@ -47,8 +47,12 @@ public object Hooky {
     private var suiviNonLus: Job? = null
     private var cycleDeVie: Application.ActivityLifecycleCallbacks? = null
     private var activiteOuverte: WeakReference<Activity>? = null
+    // Ce que l'app a dit du visiteur, gardé ici aussi : identify avant
+    // configure, et une nouvelle configuration, ne le perdent pas.
     private var nom: String? = null
     private var email: String? = null
+    private var utilisateur: String? = null
+    private val donnees = LinkedHashMap<String, Any?>()
 
     internal var moteur: Moteur? = null
         private set(valeur) {
@@ -106,9 +110,11 @@ public object Hooky {
             identite = identite,
             fuseau = TimeZone.getDefault().id,
             page = "android-app://" + application.packageName,
+            appareil = Appareil.actuel(),
         )
-        nouveau.nomVisiteur = nom
-        nouveau.emailVisiteur = email
+        // Avant le démarrage : un autre compte que celui de la conversation
+        // enregistrée repart d'une page blanche.
+        nouveau.identifier(nom, email, utilisateur, donnees)
         moteur = nouveau
         Images.initialiser(application, clientHttp)
         suiviNonLus = portee.launch { nouveau.nonLus.collect { nonLus.value = it } }
@@ -118,18 +124,59 @@ public object Hooky {
     }
 
     /**
-     * Optional: who the visitor is (your signed-in user). Sent when the
-     * conversation starts; the bubble then skips its name and email form.
+     * Optional: who the visitor is (your signed-in user). Never throws.
+     *
+     * Sent with the first message, or right away (grouped, within a second)
+     * when a conversation already exists; retried with the next message if
+     * the device is offline. With an email, the bubble skips its name and
+     * email form.
+     *
+     * ```
+     * Hooky.identify("Lou", "lou@example.com", "42", mapOf("plan" to "Pro", "cart" to 49.9))
+     * ```
+     *
+     * @param name the first name; replaces the conversation's (`null` clears it on this device).
+     * @param email the email; replaces the conversation's (`null` clears it on this device).
+     * @param userId your own id for this user, shown to your team (not verified); `null` leaves it
+     *   unchanged. A different `userId` than the current conversation's starts a new conversation,
+     *   like [reset]: another account on the same device never sees the previous one's thread.
+     * @param attributes free data shown to your team, merged with the previous ones: strings,
+     *   numbers, booleans; `null` removes a key. Up to 50 keys.
      */
     @JvmStatic
     @JvmOverloads
-    public fun identify(name: String?, email: String? = null) {
+    public fun identify(name: String?, email: String? = null, userId: String? = null, attributes: Map<String, Any?> = emptyMap()) {
         nom = name?.trim()?.takeIf { it.isNotEmpty() }
         this.email = email?.trim()?.takeIf { it.isNotEmpty() }
-        moteur?.let {
-            it.nomVisiteur = nom
-            it.emailVisiteur = this.email
+        val compte = userId?.trim()?.takeIf { it.isNotEmpty() }
+        // Un autre compte : les données libres du précédent ne le suivent pas.
+        if (compte != null && utilisateur != null && compte != utilisateur) donnees.clear()
+        if (compte != null) utilisateur = compte
+        retenir(attributes)
+        val moteur = moteur ?: return
+        if (moteur.identifier(nom, this.email, compte, attributes)) {
+            // La conversation enregistrée était celle d'un autre compte.
+            close()
+            donnees.clear()
+            retenir(attributes)
         }
+    }
+
+    /**
+     * Adds free data about the visitor, shown to your team next to the
+     * conversation: `setAttributes(mapOf("plan" to "Pro", "cart" to 49.9))`.
+     * Merged with the previous data (`null` removes a key). Sent with the first
+     * message, or right away (grouped, within a second) when a conversation
+     * already exists. Never throws.
+     */
+    @JvmStatic
+    public fun setAttributes(attributes: Map<String, Any?>) {
+        retenir(attributes)
+        moteur?.ajouterDonnees(attributes)
+    }
+
+    private fun retenir(attributes: Map<String, Any?>) {
+        attributes.forEach { (cle, valeur) -> if (valeur == null) donnees.remove(cle) else donnees[cle] = valeur }
     }
 
     /** Opens the conversation full screen (an Activity, from any Context). */
@@ -160,17 +207,15 @@ public object Hooky {
         moteur.suivre(name, value, properties)
     }
 
-    /** Forgets the conversation and the identity (call it when your user signs out). */
+    /** Forgets the conversation, the identity and the attributes (call it when your user signs out). */
     @JvmStatic
     public fun reset() {
         nom = null
         email = null
+        utilisateur = null
+        donnees.clear()
         close()
-        moteur?.let {
-            it.nomVisiteur = null
-            it.emailVisiteur = null
-            it.oublier()
-        }
+        moteur?.oublier(identite = true)
     }
 
     /**
