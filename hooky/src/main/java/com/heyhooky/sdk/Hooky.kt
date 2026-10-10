@@ -19,7 +19,9 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.Closeable
 import java.lang.ref.WeakReference
+import java.util.Collections
 import java.util.TimeZone
+import java.util.WeakHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -45,6 +47,8 @@ public object Hooky {
     private val portee = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val nonLus = MutableStateFlow(0)
     private var suiviNonLus: Job? = null
+    private var suiviSite: Job? = null
+    private val siteCourant = MutableStateFlow<Site?>(null)
     private var cycleDeVie: Application.ActivityLifecycleCallbacks? = null
     private var activiteOuverte: WeakReference<Activity>? = null
     private var nom: String? = null
@@ -88,9 +92,10 @@ public object Hooky {
             if (actuel.cleSite == siteKey && actuel.adresseApi == apiUrl.trimEnd('/')) return
             actuel.premierPlan(false)
             suiviNonLus?.cancel()
+            suiviSite?.cancel()
         }
 
-        val identite = Identite(client = "hooky-android/$VERSION", app = descriptionApp(application))
+        val identite = Identite(client = nomClient(), app = descriptionApp(application))
         val api = Api(apiUrl.trimEnd('/'), clientHttp, identite)
         val stockage: Stockage = try {
             StockageFichier(application.noBackupFilesDir, siteKey)
@@ -112,6 +117,7 @@ public object Hooky {
         moteur = nouveau
         Images.initialiser(application, clientHttp)
         suiviNonLus = portee.launch { nouveau.nonLus.collect { nonLus.value = it } }
+        suiviSite = portee.launch { nouveau.etat.collect { siteCourant.value = it.site } }
         surveillerPremierPlan(application)
         nouveau.demarrer()
         if (auPremierPlan()) nouveau.premierPlan(true)
@@ -189,6 +195,41 @@ public object Hooky {
         public fun onUnreadCountChanged(count: Int)
     }
 
+    // Pour les surcouches du SDK (le plugin Flutter) : se présenter au
+    // serveur sous leur propre nom, et lire l'apparence du site pour dessiner
+    // leur bulle. Réservé, d'où l'opt-in.
+
+    /**
+     * The `X-Hooky-Client` value (`hooky-flutter/1.0.0`…), set before
+     * [configure]; `null` for the default `hooky-android/<version>`.
+     */
+    @HookyWrapperApi
+    @JvmStatic
+    public var clientName: String? = null
+
+    @OptIn(HookyWrapperApi::class)
+    private fun nomClient(): String = clientName?.trim()?.takeIf { it.isNotEmpty() } ?: "hooky-android/$VERSION"
+
+    /**
+     * [listener] is called on the main thread with the site's name, color
+     * (`#RRGGBB`) and bubble side (`left` or `right`) once its appearance is
+     * loaded, then at every change. Close the handle to stop listening.
+     */
+    @HookyWrapperApi
+    @JvmStatic
+    public fun addSiteListener(listener: SiteListener): Closeable {
+        val job = portee.launch {
+            siteCourant.collect { site -> site?.let { listener.onSite(it.nom, it.couleur, it.position) } }
+        }
+        return Closeable { job.cancel() }
+    }
+
+    /** Receives the site's appearance. */
+    @HookyWrapperApi
+    public fun interface SiteListener {
+        public fun onSite(name: String, color: String, position: String)
+    }
+
     internal fun activiteOuverte(activite: Activity?) {
         activiteOuverte = activite?.let { WeakReference(it) }
     }
@@ -216,19 +257,21 @@ public object Hooky {
     private fun surveillerPremierPlan(application: Application) {
         if (cycleDeVie != null) return
         val rappels = object : Application.ActivityLifecycleCallbacks {
-            // On part de zéro même si l'app est déjà au premier plan (configure
-            // dans Application.onCreate) : l'activité qui démarre sera comptée,
-            // et une activité déjà démarrée qui s'arrête ramène à zéro.
-            private var demarrees = 0
+            // Les activités démarrées depuis configure. Une activité déjà
+            // démarrée avant (configure appelé après son onStart, comme dans
+            // une app Flutter) n'y est pas : quand elle s'arrête parce que la
+            // conversation s'ouvre par-dessus, l'app reste au premier plan ;
+            // elle ne passe en arrière-plan que s'il n'en reste aucune.
+            private val demarrees = Collections.newSetFromMap(WeakHashMap<Activity, Boolean>())
 
             override fun onActivityStarted(activity: Activity) {
-                demarrees++
-                if (demarrees == 1) moteur?.premierPlan(true)
+                demarrees.add(activity)
+                if (demarrees.size == 1) moteur?.premierPlan(true)
             }
 
             override fun onActivityStopped(activity: Activity) {
-                demarrees = (demarrees - 1).coerceAtLeast(0)
-                if (demarrees == 0 && !activity.isChangingConfigurations) moteur?.premierPlan(false)
+                demarrees.remove(activity)
+                if (demarrees.isEmpty() && !activity.isChangingConfigurations) moteur?.premierPlan(false)
             }
 
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
