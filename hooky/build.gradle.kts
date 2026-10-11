@@ -1,5 +1,10 @@
-// La bibliothèque : com.heyhooky:hooky-android, publiée plus tard par JitPack
-// ou Maven Central (maven-publish est prêt, rien n'est publié d'ici).
+// La bibliothèque, distribuée par JitPack depuis le dépôt public
+// github.com/Defdjamel/hooky-android (ce dossier, à sa racine) :
+//   repositories { maven("https://jitpack.io") }
+//   implementation("com.github.Defdjamel:hooky-android:1.0.0")
+// JitPack lance jitpack.yml (publishReleasePublicationToMavenLocal) et sert
+// ce qui sort dans son ~/.m2 sous com.github.Defdjamel : l'AAR, ses sources,
+// le POM et le module Gradle. L'app d'exemple n'est jamais publiée.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
@@ -9,8 +14,13 @@ plugins {
 // La version du SDK : publiée, et envoyée à l'API (X-Hooky-Client).
 val versionSdk = "1.0.0"
 
-group = "com.heyhooky"
-version = versionSdk
+// Les coordonnées publiées. JitPack donne la version (le tag : 1.0.0, ou un
+// commit) dans $VERSION ; hors de JitPack, celle du SDK.
+val groupePublie = "com.github.Defdjamel"
+val versionPubliee = System.getenv("VERSION")?.takeIf { System.getenv("JITPACK") == "true" } ?: versionSdk
+
+group = groupePublie
+version = versionPubliee
 
 android {
     namespace = "com.heyhooky.sdk"
@@ -96,16 +106,30 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.heyhooky"
+            groupId = groupePublie
             artifactId = "hooky-android"
-            version = versionSdk
+            version = versionPubliee
             afterEvaluate { from(components["release"]) }
             pom {
                 name.set("Hooky for Android")
                 description.set("The Hooky chat bubble for Android apps: native Jetpack Compose UI, realtime replies, attachments.")
                 url.set("https://heyhooky.com")
-                // La licence, les développeurs et le scm (exigés par Maven
-                // Central) restent à choisir avant la première publication.
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+                developers {
+                    developer {
+                        name.set("Hooky")
+                        url.set("https://heyhooky.com")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/Defdjamel/hooky-android")
+                    connection.set("scm:git:https://github.com/Defdjamel/hooky-android.git")
+                }
             }
         }
     }

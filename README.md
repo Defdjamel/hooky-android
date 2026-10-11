@@ -14,17 +14,32 @@ works in Compose apps and in classic View/XML apps alike.
 
 ## Install
 
-Once published, add the dependency:
+The SDK is built by [JitPack](https://jitpack.io/#Defdjamel/hooky-android)
+from its GitHub repository. Add JitPack to your repositories, in
+`settings.gradle.kts`:
 
 ```kotlin
-// build.gradle.kts of your app module
-dependencies {
-    implementation("com.heyhooky:hooky-android:1.0.0")
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
 }
 ```
 
-Until then, include the `hooky` module of this folder in your build
-(`includeBuild` or copy it as a module).
+then the dependency, in your app module's `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("com.github.Defdjamel:hooky-android:1.0.0")
+}
+```
+
+In Groovy: `maven { url 'https://jitpack.io' }` and
+`implementation 'com.github.Defdjamel:hooky-android:1.0.0'`. Its own
+dependencies (AndroidX, Compose, OkHttp, coroutines) come from `google()` and
+`mavenCentral()`.
 
 ## The 3 lines
 
@@ -193,8 +208,13 @@ sdk/android
 ```sh
 ./gradlew :hooky:testDebugUnitTest   # JVM tests: protocol, decoding, storage, reconnection, identify, Compose UI (Robolectric)
 ./gradlew :exemple:installDebug      # sample app on a device or emulator
-./gradlew :hooky:publishToMavenLocal # com.heyhooky:hooky-android:1.0.0 in ~/.m2
 ```
+
+`jitpack.yml` tells JitPack what to build: only the library
+(`./gradlew :hooky:publishReleasePublicationToMavenLocal`, with JDK 21), never
+the sample app. The published coordinates are
+`com.github.Defdjamel:hooky-android:<tag>` (AAR, sources, POM and Gradle
+module metadata).
 
 The sample app reads its settings from `local.properties` (or `-P`):
 
@@ -205,3 +225,7 @@ hooky.api=http://10.0.2.2:3032   # debug only; the emulator sees your Mac as 10.
 
 Cleartext HTTP is allowed in the sample's debug build only, for
 `10.0.2.2` and `localhost`.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

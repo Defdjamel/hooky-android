@@ -1,0 +1,12 @@
+# La recette de JitPack (https://jitpack.io/#Defdjamel/hooky-android), à la
+# racine du dépôt public hooky-android (= sdk/android du dépôt Hooky).
+#
+# Sans ce fichier, JitPack lancerait « ./gradlew build publishToMavenLocal » :
+# l'app d'exemple serait construite (et les tests lancés) pour rien. Ici,
+# seule la bibliothèque est publiée dans le ~/.m2 de JitPack :
+#   com/github/Defdjamel/hooky-android/<tag>/  (aar, sources, pom, module)
+# JitPack donne le tag dans $VERSION (voir hooky/build.gradle.kts).
+jdk:
+  - openjdk21
+install:
+  - ./gradlew --no-daemon :hooky:publishReleasePublicationToMavenLocal
