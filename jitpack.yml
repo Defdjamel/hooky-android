@@ -6,7 +6,9 @@
 # seule la bibliothèque est publiée dans le ~/.m2 de JitPack :
 #   com/github/Defdjamel/hooky-android/<tag>/  (aar, sources, pom, module)
 # JitPack donne le tag dans $VERSION (voir hooky/build.gradle.kts).
+# JDK 17 : JitPack ne fournit pas de JDK 21 (sdkman hors ligne sur ses
+# machines) ; AGP 9 et la cible JVM 17 de la bibliothèque s'en contentent.
 jdk:
-  - openjdk21
+  - openjdk17
 install:
   - ./gradlew --no-daemon :hooky:publishReleasePublicationToMavenLocal

@@ -1,7 +1,7 @@
 // La bibliothèque, distribuée par JitPack depuis le dépôt public
 // github.com/Defdjamel/hooky-android (ce dossier, à sa racine) :
 //   repositories { maven("https://jitpack.io") }
-//   implementation("com.github.Defdjamel:hooky-android:1.0.0")
+//   implementation("com.github.Defdjamel:hooky-android:1.0.1")
 // JitPack lance jitpack.yml (publishReleasePublicationToMavenLocal) et sert
 // ce qui sort dans son ~/.m2 sous com.github.Defdjamel : l'AAR, ses sources,
 // le POM et le module Gradle. L'app d'exemple n'est jamais publiée.
