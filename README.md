@@ -14,8 +14,8 @@ works in Compose apps and in classic View/XML apps alike.
 
 ## Install
 
-The SDK is built by [JitPack](https://jitpack.io/#Defdjamel/hooky-android)
-from its GitHub repository. Add JitPack to your repositories, in
+The SDK is served from this GitHub repository, as a Maven repository on
+GitHub Pages (the `maven` branch). Add it to your repositories, in
 `settings.gradle.kts`:
 
 ```kotlin
@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://jitpack.io")
+        maven("https://defdjamel.github.io/hooky-android")
     }
 }
 ```
@@ -32,12 +32,12 @@ then the dependency, in your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.Defdjamel:hooky-android:1.0.1")
+    implementation("com.heyhooky:hooky-android:1.0.0")
 }
 ```
 
-In Groovy: `maven { url 'https://jitpack.io' }` and
-`implementation 'com.github.Defdjamel:hooky-android:1.0.1'`. Its own
+In Groovy: `maven { url 'https://defdjamel.github.io/hooky-android' }` and
+`implementation 'com.heyhooky:hooky-android:1.0.0'`. Its own
 dependencies (AndroidX, Compose, OkHttp, coroutines) come from `google()` and
 `mavenCentral()`.
 
@@ -210,11 +210,10 @@ sdk/android
 ./gradlew :exemple:installDebug      # sample app on a device or emulator
 ```
 
-`jitpack.yml` tells JitPack what to build: only the library
-(`./gradlew :hooky:publishReleasePublicationToMavenLocal`, with JDK 21), never
-the sample app. The published coordinates are
-`com.github.Defdjamel:hooky-android:<tag>` (AAR, sources, POM and Gradle
-module metadata).
+`./gradlew :hooky:publishReleasePublicationToDepotRepository` writes the
+Maven repository to `hooky/build/depot-maven` (AAR, sources, POM and Gradle
+module metadata of `com.heyhooky:hooky-android`), which is published to the
+`maven` branch, served by GitHub Pages. The sample app is never published.
 
 The sample app reads its settings from `local.properties` (or `-P`):
 

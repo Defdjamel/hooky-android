@@ -1,10 +1,11 @@
-// La bibliothèque, distribuée par JitPack depuis le dépôt public
-// github.com/Defdjamel/hooky-android (ce dossier, à sa racine) :
-//   repositories { maven("https://jitpack.io") }
-//   implementation("com.github.Defdjamel:hooky-android:1.0.1")
-// JitPack lance jitpack.yml (publishReleasePublicationToMavenLocal) et sert
-// ce qui sort dans son ~/.m2 sous com.github.Defdjamel : l'AAR, ses sources,
-// le POM et le module Gradle. L'app d'exemple n'est jamais publiée.
+// La bibliothèque, servie par GitHub Pages depuis la branche « maven » du
+// dépôt public github.com/Defdjamel/hooky-android (ce dossier, à sa racine) :
+//   repositories { maven("https://defdjamel.github.io/hooky-android") }
+//   implementation("com.heyhooky:hooky-android:1.0.0")
+// `./gradlew :hooky:publishReleasePublicationToDepotRepository` écrit le dépôt
+// Maven dans build/depot-maven (l'AAR, ses sources, le POM et le module
+// Gradle), à recopier dans la branche « maven » (sdk/publier-maven.sh).
+// JitPack (jitpack.yml) reste possible, sous com.github.Defdjamel.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
@@ -14,10 +15,11 @@ plugins {
 // La version du SDK : publiée, et envoyée à l'API (X-Hooky-Client).
 val versionSdk = "1.0.0"
 
-// Les coordonnées publiées. JitPack donne la version (le tag : 1.0.0, ou un
-// commit) dans $VERSION ; hors de JitPack, celle du SDK.
-val groupePublie = "com.github.Defdjamel"
-val versionPubliee = System.getenv("VERSION")?.takeIf { System.getenv("JITPACK") == "true" } ?: versionSdk
+// Les coordonnées publiées : com.heyhooky, à la version du SDK. Sur JitPack,
+// com.github.Defdjamel, à la version qu'il donne (le tag) dans $VERSION.
+val surJitpack = System.getenv("JITPACK") == "true"
+val groupePublie = if (surJitpack) "com.github.Defdjamel" else "com.heyhooky"
+val versionPubliee = System.getenv("VERSION")?.takeIf { surJitpack } ?: versionSdk
 
 group = groupePublie
 version = versionPubliee
@@ -108,6 +110,13 @@ dependencies {
 }
 
 publishing {
+    repositories {
+        // Le dépôt Maven statique servi par GitHub Pages (voir plus haut).
+        maven {
+            name = "depot"
+            url = uri(layout.buildDirectory.dir("depot-maven"))
+        }
+    }
     publications {
         register<MavenPublication>("release") {
             groupId = groupePublie
