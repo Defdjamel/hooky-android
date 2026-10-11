@@ -73,12 +73,16 @@ kotlin {
 }
 
 dependencies {
+    // En « api » : ce que l'API publique montre à l'app (HookyActivity est une
+    // ComponentActivity, HookyBubble prend un Modifier, HookyBubbleView est une
+    // AbstractComposeView, unreadCount un StateFlow). Le POM les déclare en
+    // compile : l'app les a sans les nommer.
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.activity.compose)
+    api(libs.androidx.activity.compose)
 
     // Compose + Material 3 (versions alignées par la BoM).
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
+    api(platform(libs.androidx.compose.bom))
+    api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -86,7 +90,7 @@ dependencies {
 
     // Réseau : HTTP, WebSocket (Action Cable) et multipart.
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.coroutines.android)
+    api(libs.kotlinx.coroutines.android)
 
     // Tests JVM : le vrai org.json (celui d'Android n'est qu'un bouchon hors
     // de l'appareil) et un faux serveur pour le protocole.
