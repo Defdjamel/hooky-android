@@ -1,0 +1,178 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.heyhooky",
+    "module": "hooky-android",
+    "version": "1.0.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.3.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.activity",
+          "module": "activity-compose",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose",
+          "module": "compose-bom",
+          "version": {
+            "requires": "2026.06.01"
+          },
+          "attributes": {
+            "org.gradle.category": "platform"
+          }
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui"
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-android",
+          "version": {
+            "requires": "1.11.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "hooky-android-1.0.0.aar",
+          "url": "hooky-android-1.0.0.aar",
+          "size": 472467,
+          "sha512": "970cebc9f0c074b1c864b0ae5bb303f3c79b0010c8f37b084591b5dc2c9d618e37a5a7d458497638601926f40fbabc62170bbb53651cb4bd9508f15c24714b13",
+          "sha256": "e4951f94b0311fc33c240353411b1894af6adc61fd913942f66d94d9b5e8bd91",
+          "sha1": "f5da59c83e1d1a745234c74a567c1584bc147986",
+          "md5": "c06f1aef05282cee9a25960958e30888"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.18.0"
+          }
+        },
+        {
+          "group": "androidx.compose.foundation",
+          "module": "foundation"
+        },
+        {
+          "group": "androidx.compose.material3",
+          "module": "material3"
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui-tooling-preview"
+        },
+        {
+          "group": "com.squareup.okhttp3",
+          "module": "okhttp",
+          "version": {
+            "requires": "4.12.0"
+          }
+        },
+        {
+          "group": "androidx.activity",
+          "module": "activity-compose",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose",
+          "module": "compose-bom",
+          "version": {
+            "requires": "2026.06.01"
+          },
+          "attributes": {
+            "org.gradle.category": "platform"
+          }
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui"
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-android",
+          "version": {
+            "requires": "1.11.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "hooky-android-1.0.0.aar",
+          "url": "hooky-android-1.0.0.aar",
+          "size": 472467,
+          "sha512": "970cebc9f0c074b1c864b0ae5bb303f3c79b0010c8f37b084591b5dc2c9d618e37a5a7d458497638601926f40fbabc62170bbb53651cb4bd9508f15c24714b13",
+          "sha256": "e4951f94b0311fc33c240353411b1894af6adc61fd913942f66d94d9b5e8bd91",
+          "sha1": "f5da59c83e1d1a745234c74a567c1584bc147986",
+          "md5": "c06f1aef05282cee9a25960958e30888"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "hooky-android-1.0.0-sources.jar",
+          "url": "hooky-android-1.0.0-sources.jar",
+          "size": 68753,
+          "sha512": "71fb11cd0585f4c94466820029d3b153df6719700b7c1194472cadbaa5b43b25bbc46a079f425b10d529c205f5878ae30929cf6243c6df17f5a9b727f3e6f34b",
+          "sha256": "3c976bf2eda8c17bf3e34f029ee9347e1f929f2469676c3bdb4d8d7d3c08e988",
+          "sha1": "8ce9a09a924a7faedf1678339aaa1adb6fc30c9a",
+          "md5": "9e535eb930cc0d16a0859c3786e8c175"
+        }
+      ]
+    }
+  ]
+}
