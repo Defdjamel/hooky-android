@@ -71,6 +71,27 @@ class StockageTest {
     }
 
     @Test
+    fun `Toujours traduire actif par défaut, coupé enregistré, un ancien 1 reste actif`() {
+        assertTrue("rien d'enregistré : actif", StockageFichier(dossier.root, "pk").toujoursTraduire)
+        StockageFichier(dossier.root, "pk").toujoursTraduire = false
+        assertFalse(StockageFichier(dossier.root, "pk").toujoursTraduire)
+        // effacer() (reset) garde le réglage, coupé ou non.
+        StockageFichier(dossier.root, "pk").apply { jeton = "abc" }.effacer()
+        assertFalse(StockageFichier(dossier.root, "pk").toujoursTraduire)
+        StockageFichier(dossier.root, "pk").toujoursTraduire = true
+        assertTrue(StockageFichier(dossier.root, "pk").toujoursTraduire)
+
+        // Le fichier d'une version d'avant le défaut actif : « 1 » si le
+        // visiteur l'avait activé, rien sinon.
+        val fichier = File(File(dossier.root, "hooky").apply { mkdirs() }, "site-" + StockageFichier.empreinte("pk_ancien") + ".properties")
+        fichier.writeText("jeton=abc\ntraduire=1\n")
+        assertTrue(StockageFichier(dossier.root, "pk_ancien").toujoursTraduire)
+        fichier.writeText("jeton=abc\n")
+        assertTrue(StockageFichier(dossier.root, "pk_ancien").toujoursTraduire)
+        assertTrue(StockageMemoire().toujoursTraduire)
+    }
+
+    @Test
     fun `un brouillon vide est effacé`() {
         val stockage = StockageFichier(dossier.root, "pk")
         stockage.brouillon = "x"

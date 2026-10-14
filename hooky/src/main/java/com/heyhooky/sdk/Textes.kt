@@ -83,8 +83,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "Voir la traduction",
                 "trad_erreur" to "Traduction impossible.",
                 "reessayer" to "Réessayer",
-                "toujours" to "Toujours traduire",
-                "options_trad" to "Traduction"
+                "toujours" to "Toujours traduire"
             ),
             "en" to mapOf(
                 "fermer" to "Close chat",
@@ -142,8 +141,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "See translation",
                 "trad_erreur" to "Couldn’t translate.",
                 "reessayer" to "Try again",
-                "toujours" to "Always translate",
-                "options_trad" to "Translation"
+                "toujours" to "Always translate"
             ),
             "es" to mapOf(
                 "fermer" to "Cerrar el chat",
@@ -201,8 +199,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "Ver la traducción",
                 "trad_erreur" to "No se pudo traducir.",
                 "reessayer" to "Reintentar",
-                "toujours" to "Traducir siempre",
-                "options_trad" to "Traducción"
+                "toujours" to "Traducir siempre"
             ),
             "pt" to mapOf(
                 "fermer" to "Fechar o chat",
@@ -260,8 +257,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "Ver a tradução",
                 "trad_erreur" to "Não foi possível traduzir.",
                 "reessayer" to "Tentar de novo",
-                "toujours" to "Traduzir sempre",
-                "options_trad" to "Tradução"
+                "toujours" to "Traduzir sempre"
             ),
             "it" to mapOf(
                 "fermer" to "Chiudi la chat",
@@ -319,8 +315,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "Mostra la traduzione",
                 "trad_erreur" to "Traduzione non riuscita.",
                 "reessayer" to "Riprova",
-                "toujours" to "Traduci sempre",
-                "options_trad" to "Traduzione"
+                "toujours" to "Traduci sempre"
             ),
             "de" to mapOf(
                 "fermer" to "Chat schließen",
@@ -378,8 +373,7 @@ internal class Textes(val langue: String) {
                 "voir_traduction" to "Übersetzung anzeigen",
                 "trad_erreur" to "Übersetzung fehlgeschlagen.",
                 "reessayer" to "Erneut versuchen",
-                "toujours" to "Immer übersetzen",
-                "options_trad" to "Übersetzung"
+                "toujours" to "Immer übersetzen"
             )
         )
     }

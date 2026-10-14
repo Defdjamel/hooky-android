@@ -6,7 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -153,6 +159,21 @@ class EcranComposeTest {
         compose.onNodeWithText("Voir l’original").performClick()
         compose.onNodeWithText("Your order shipped.").assertIsDisplayed()
         compose.onNodeWithText("Voir la traduction").assertIsDisplayed()
+    }
+
+    @Test
+    fun `le bouton Toujours traduire de l'en-tête, un interrupteur, d'un toucher`() {
+        var actif by mutableStateOf(true)
+        compose.setContent {
+            HookyTheme(site, Textes("fr")) { BoutonTraduction(actif) { actif = it } }
+        }
+        val bouton = compose.onNodeWithContentDescription("Toujours traduire")
+        bouton.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)).assertIsOn()
+        bouton.performClick()
+        assertEquals(false, actif)
+        bouton.assertIsOff()
+        bouton.performClick()
+        bouton.assertIsOn()
     }
 
     private val actionsVides = object : ActionsFil {

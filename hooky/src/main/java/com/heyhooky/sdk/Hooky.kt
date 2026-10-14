@@ -86,9 +86,11 @@ public object Hooky {
      *
      * @param siteKey the public key of your site, from the Hooky dashboard.
      * @param apiUrl the Hooky API, only to change for local tests.
-     * @param translation offers to translate the team's messages written in
-     *   another language than the bubble's (a "Translate" link under them, and
-     *   "Always translate" in the conversation's menu). On by default.
+     * @param translation translates the team's messages written in another
+     *   language than the bubble's as they arrive ("Always translate", a toggle
+     *   button in the conversation's header the visitor can turn off), with a
+     *   "Translate" link under them when it is off. On by default; `false`
+     *   shows neither the button nor the link and translates nothing.
      */
     @JvmStatic
     @JvmOverloads

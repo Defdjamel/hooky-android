@@ -32,9 +32,10 @@ internal data class EtatChat(
     val erreur: String? = null,
     val chargeAnciens: Boolean = false,
     // La traduction des messages de l'équipe (voir Traduction.kt) : où en est
-    // chacun, par id, et « Toujours traduire » (gardé par site).
+    // chacun, par id, et « Toujours traduire » (gardé par site, actif tant
+    // que le visiteur ne l'a pas coupé).
     val traductions: Map<Long, EtatTraduction> = emptyMap(),
-    val toujoursTraduire: Boolean = false,
+    val toujoursTraduire: Boolean = true,
 ) {
     // Le message en route est-il déjà arrivé par Action Cable avant la
     // réponse de l'API ? Alors on ne l'affiche pas deux fois.
@@ -67,7 +68,8 @@ internal class Moteur(
     private val appareil: String? = null,
     // Plusieurs changements du profil en moins d'une seconde : un seul PATCH.
     private val delaiProfil: Long = 1_000,
-    // Hooky.configure(translation = false) : ni lien ni menu de traduction.
+    // Hooky.configure(translation = false) : ni lien ni bouton de traduction,
+    // et rien ne se traduit.
     val traductionActive: Boolean = true,
 ) {
     private val _etat = MutableStateFlow(EtatChat(toujoursTraduire = stockage.toujoursTraduire))
@@ -363,10 +365,10 @@ internal class Moteur(
     fun traduisible(message: Message): Boolean =
         traductionActive && RegleTraduction.traduisible(message, textes.langue)
 
-    // Le menu « Toujours traduire » n'est proposé que s'il sert : un message
-    // de l'équipe dans une autre langue (ou le réglage déjà actif).
+    // Le bouton « Toujours traduire » n'est montré que s'il sert : un message
+    // de l'équipe dans une autre langue.
     fun proposeTraduction(etat: EtatChat = _etat.value): Boolean =
-        traductionActive && (etat.toujoursTraduire || etat.messages.any(::traduisible))
+        traductionActive && etat.messages.any(::traduisible)
 
     // « Traduire », ou « Réessayer » après une erreur. Déjà en mémoire : aucun appel.
     fun traduire(message: Message) {
@@ -386,14 +388,24 @@ internal class Moteur(
         poserTraductions(mapOf(message.id to actuel.copy(original = !actuel.original)))
     }
 
-    // Activé : les messages déjà traduits passent en traduction (les autres
-    // se traduisent) ; coupé : on relit les originaux.
+    // Activé : les messages déjà traduits passent en traduction (les autres,
+    // et ceux en erreur, se traduisent) ; coupé : on relit les originaux, et
+    // les traductions pas encore arrivées ne s'affichent pas (le lien
+    // « Traduire » revient).
     fun toujoursTraduire(actif: Boolean) {
         stockage.toujoursTraduire = actif
+        if (!actif) fileTraductions.removeAll { _etat.value.traductions[it] == EtatTraduction.EnCours }
         _etat.update { e ->
             e.copy(
                 toujoursTraduire = actif,
-                traductions = e.traductions.mapValues { (_, t) -> if (t is EtatTraduction.Faite) t.copy(original = !actif) else t },
+                traductions = e.traductions.mapNotNull { (id, t) ->
+                    when {
+                        t is EtatTraduction.Faite -> id to t.copy(original = !actif)
+                        actif && t == EtatTraduction.Echec -> null
+                        !actif -> null
+                        else -> id to t
+                    }
+                }.toMap(),
             )
         }
         traduireLesNouveaux()
@@ -432,9 +444,13 @@ internal class Moteur(
         val jeton = jeton
         val message = _etat.value.messages.firstOrNull { it.id == id }
         if (jeton == null || message == null || !traduisible(message)) return poserTraductions(mapOf(id to null))
+        // Plus attendue (« Toujours traduire » coupé entre-temps) : rien à demander.
+        if (_etat.value.traductions[id] != EtatTraduction.EnCours) return
         try {
             val traduction = api.traduire(jeton, id, textes.langue)
             if (jeton != this.jeton) return
+            // Coupé pendant l'appel : gardée, mais c'est l'original qui s'affiche.
+            val voulue = _etat.value.traductions[id] == EtatTraduction.EnCours
             val source = RegleTraduction.codeCourt(traduction.source ?: message.langue)
             if (source == RegleTraduction.codeCourt(textes.langue)) {
                 // Le message était déjà dans la langue de la bulle : plus de
@@ -446,12 +462,14 @@ internal class Moteur(
                     )
                 }
             } else {
-                poserTraductions(mapOf(id to EtatTraduction.Faite(traduction.texte, source)))
+                poserTraductions(mapOf(id to EtatTraduction.Faite(traduction.texte, source, original = !voulue)))
             }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            if (jeton == this.jeton) poserTraductions(mapOf(id to EtatTraduction.Echec))
+            if (jeton != this.jeton) return
+            val voulue = _etat.value.traductions[id] == EtatTraduction.EnCours
+            poserTraductions(mapOf(id to if (voulue) EtatTraduction.Echec else null))
         }
     }
 

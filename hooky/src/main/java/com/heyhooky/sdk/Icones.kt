@@ -36,6 +36,13 @@ internal object Icones {
         "M4 5h9M8.5 3v2M11 5c-1 4.5-3.6 7.6-7 9.5M6.5 9c1.3 2.2 3 3.8 5 4.8",
         "M13 21l4-9 4 9M14.5 17.6h5",
     )
+    // La même, barrée : « Toujours traduire » coupé.
+    val traduireCoupe = trait(
+        "traduire-coupe",
+        "M4 5h9M8.5 3v2M11 5c-1 4.5-3.6 7.6-7 9.5M6.5 9c1.3 2.2 3 3.8 5 4.8",
+        "M13 21l4-9 4 9M14.5 17.6h5",
+        "M3 3l18 18",
+    )
 
     private fun trait(nom: String, vararg chemins: String): ImageVector =
         ImageVector.Builder(name = nom, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)

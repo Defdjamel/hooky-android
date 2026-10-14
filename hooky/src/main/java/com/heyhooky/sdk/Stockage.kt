@@ -8,7 +8,8 @@ import java.util.Properties
 // conversation (la seule clé du visiteur), l'identifiant du client donné par
 // identify(userId) avec lui, le brouillon, le dernier message de l'équipe
 // déjà lu (pour compter les non-lus), et « Toujours traduire » (un réglage de
-// l'appareil : effacer() le garde).
+// l'appareil : effacer() le garde ; actif tant que le visiteur ne l'a pas
+// coupé).
 internal interface Stockage {
     var jeton: String?
     var utilisateur: String?
@@ -51,15 +52,17 @@ internal class StockageFichier(dossier: File, cleSite: String) : Stockage {
         get() = lire("lu")?.toLongOrNull() ?: 0
         set(valeur) = ecrire("lu", valeur.toString())
 
+    // Trois états sous la même clé : rien (actif par défaut), « 1 » (activé,
+    // ou un ancien réglage d'avant le défaut actif) et « 0 » (coupé).
     override var toujoursTraduire: Boolean
-        get() = lire("traduire") == "1"
-        set(valeur) = ecrire("traduire", if (valeur) "1" else null)
+        get() = lire("traduire") != "0"
+        set(valeur) = ecrire("traduire", if (valeur) "1" else "0")
 
     override fun effacer() {
-        val traduire = toujoursTraduire
+        val traduire = lire("traduire")
         synchronized(valeurs) { valeurs.clear() }
         fichier.delete()
-        toujoursTraduire = traduire
+        if (traduire != null) ecrire("traduire", traduire)
     }
 
     private fun lire(cle: String): String? = synchronized(valeurs) { valeurs.getProperty(cle) }
@@ -96,7 +99,7 @@ internal class StockageMemoire : Stockage {
     override var utilisateur: String? = null
     override var brouillon: String? = null
     override var luJusqua: Long = 0
-    override var toujoursTraduire: Boolean = false
+    override var toujoursTraduire: Boolean = true
     override fun effacer() {
         jeton = null
         utilisateur = null

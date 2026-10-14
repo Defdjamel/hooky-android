@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -27,12 +27,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,8 +50,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -274,9 +269,9 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
 }
 
 // L'en-tête aux couleurs du site : « Salut ! On t'écoute. » avant la
-// conversation, puis le nom du site ; le menu de traduction (toujoursTraduire
-// non nul : proposé dès qu'un message de l'équipe est dans une autre
-// langue) ; le bouton pour fermer.
+// conversation, puis le nom du site ; le bouton « Toujours traduire »
+// (toujoursTraduire non nul : montré dès qu'un message de l'équipe est dans
+// une autre langue) ; le bouton pour fermer.
 @Composable
 private fun Entete(
     titre: String,
@@ -312,7 +307,7 @@ private fun Entete(
                 }
             }
             val forme = RoundedCornerShape(12.dp)
-            if (toujoursTraduire != null) MenuTraduction(toujoursTraduire, basculerToujours)
+            if (toujoursTraduire != null) BoutonTraduction(toujoursTraduire, basculerToujours)
             Box(
                 Modifier
                     .size(40.dp)
@@ -329,62 +324,31 @@ private fun Entete(
     }
 }
 
-// Le bouton de traduction de l'en-tête et son menu : « Toujours traduire »,
-// un interrupteur (annoncé comme tel par TalkBack).
+// Le bouton bascule de l'en-tête : « Toujours traduire », d'un toucher.
+// Actif, il prend la couleur du site, enfoncé (sans son ombre) ; coupé, la
+// carte de l'en-tête et l'icône grise barrée. TalkBack l'annonce comme un
+// interrupteur, avec son état.
 @Composable
-private fun MenuTraduction(actif: Boolean, basculer: (Boolean) -> Unit) {
+internal fun BoutonTraduction(actif: Boolean, basculer: (Boolean) -> Unit) {
     val palette = LocalPalette.current
     val textes = LocalTextes.current
-    var ouvert by remember { mutableStateOf(false) }
     val forme = RoundedCornerShape(12.dp)
-    Box {
-        Box(
-            Modifier
-                .size(40.dp)
-                .carteDure(forme, palette.carte, palette.trait, palette.ombre, 2.dp)
-                .clip(forme)
-                .clickable(role = Role.Button, onClickLabel = textes.t("options_trad")) { ouvert = true }
-                .semantics { contentDescription = textes.t("options_trad") },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icones.traduire, null, Modifier.size(22.dp), tint = palette.encre)
-        }
-        DropdownMenu(
-            expanded = ouvert,
-            onDismissRequest = { ouvert = false },
-            shape = RoundedCornerShape(18.dp),
-            containerColor = palette.carte,
-            border = BorderStroke(TRAIT, palette.trait),
-            shadowElevation = 0.dp,
-            tonalElevation = 0.dp,
-        ) {
-            DropdownMenuItem(
-                text = { Text(textes.t("toujours"), color = palette.encre, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) },
-                leadingIcon = { Icon(Icones.traduire, null, Modifier.size(20.dp), tint = palette.encre) },
-                trailingIcon = {
-                    Switch(
-                        checked = actif,
-                        onCheckedChange = null,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = palette.carte,
-                            checkedTrackColor = palette.encre,
-                            checkedBorderColor = palette.encre,
-                            uncheckedThumbColor = palette.gris,
-                            uncheckedTrackColor = palette.doux,
-                            uncheckedBorderColor = palette.trait,
-                        ),
-                    )
-                },
-                onClick = {
-                    ouvert = false
-                    basculer(!actif)
-                },
-                modifier = Modifier.semantics(mergeDescendants = true) {
-                    role = Role.Switch
-                    toggleableState = ToggleableState(actif)
-                },
-            )
-        }
+    Box(
+        Modifier
+            .size(40.dp)
+            .offset(if (actif) 2.dp else 0.dp, if (actif) 2.dp else 0.dp)
+            .carteDure(forme, if (actif) palette.accent else palette.carte, palette.trait, palette.ombre, if (actif) 0.dp else 2.dp)
+            .clip(forme)
+            .toggleable(value = actif, role = Role.Switch, onValueChange = basculer)
+            .semantics { contentDescription = textes.t("toujours") },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (actif) Icones.traduire else Icones.traduireCoupe,
+            null,
+            Modifier.size(22.dp),
+            tint = if (actif) palette.surAccent else palette.gris,
+        )
     }
 }
 

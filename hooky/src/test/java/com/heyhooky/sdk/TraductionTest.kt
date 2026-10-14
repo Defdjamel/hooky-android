@@ -27,12 +27,13 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 // La traduction des messages de l'équipe : la langue des messages décodée,
 // quand le lien « Traduire » apparaît, la route contre un faux serveur, la
 // mémoire des traductions, l'erreur réessayable, la langue corrigée, le
-// message rediffusé en direct, « Toujours traduire » (gardé par site, même
-// après reset) et les noms de langue.
+// message rediffusé en direct, « Toujours traduire » (actif par défaut,
+// gardé par site, même après reset ; coupé, réactivé) et les noms de langue.
 class TraductionTest {
     @get:Rule
     val dossier = TemporaryFolder()
@@ -45,6 +46,8 @@ class TraductionTest {
     @Volatile private var identifiant: String? = null
     @Volatile private var statutTraduction = 200
     @Volatile private var source = "en"
+    // Le temps que met le faux serveur à rendre une traduction.
+    @Volatile private var retardTraduction = 0L
     private val moteurs = CopyOnWriteArrayList<Moteur>()
 
     // Le visiteur en français, l'équipe en anglais (2 et 3), puis en français (4).
@@ -74,7 +77,7 @@ class TraductionTest {
                             json(statutTraduction, """{"error": "translation_unavailable"}""")
                         } else {
                             json(200, """{"translation": {"message_id": $id, "locale": "fr", "source_locale": "$source", "body": "Traduction $id"}}""")
-                        }
+                        }.setHeadersDelay(retardTraduction, TimeUnit.MILLISECONDS)
                     }
                     chemin == "/cable" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                         override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -122,6 +125,9 @@ class TraductionTest {
             page = null,
             traductionActive = traduction,
         ).also { moteurs += it }
+
+    // « Toujours traduire » coupé : la traduction message par message, au lien.
+    private fun manuel() = StockageMemoire().apply { jeton = "jeton-1"; toujoursTraduire = false }
 
     // Un moteur avec le fil chargé.
     private fun charge(stockage: Stockage = StockageMemoire().apply { jeton = "jeton-1" }, traduction: Boolean = true): Moteur {
@@ -187,12 +193,14 @@ class TraductionTest {
     }
 
     @Test
-    fun `désactivée par configure, ni lien ni menu`() {
+    fun `désactivée par configure, ni lien ni bouton, rien ne se traduit`() {
         val moteur = charge(traduction = false)
         assertFalse(moteur.etat.value.messages.any(moteur::traduisible))
         assertFalse(moteur.proposeTraduction())
+        assertTrue("« Toujours traduire » actif par défaut n'y change rien", moteur.etat.value.traductions.isEmpty())
         sur { moteur.traduire(moteur.message(2)) }
         assertNull(moteur.traduction(2))
+        assertTrue(traductions.isEmpty())
     }
 
     // ------------------------------------------------------------ la route --
@@ -222,7 +230,7 @@ class TraductionTest {
 
     @Test
     fun `traduire, voir l'original, sans redemander`() {
-        val moteur = charge()
+        val moteur = charge(manuel())
         assertEquals(listOf(2L, 3L), moteur.etat.value.messages.filter(moteur::traduisible).map { it.id })
         assertTrue(moteur.proposeTraduction())
 
@@ -246,7 +254,7 @@ class TraductionTest {
     @Test
     fun `une erreur se réessaie`() {
         statutTraduction = 503
-        val moteur = charge()
+        val moteur = charge(manuel())
         sur { moteur.traduire(moteur.message(2)) }
         attendre("l'erreur") { moteur.traduction(2) == EtatTraduction.Echec }
         assertEquals("Hi! Your order shipped this morning.", moteur.affiche(2))
@@ -259,7 +267,7 @@ class TraductionTest {
     @Test
     fun `déjà dans la langue de la bulle, le lien disparaît`() {
         source = "fr"
-        val moteur = charge()
+        val moteur = charge(manuel())
         sur { moteur.traduire(moteur.message(2)) }
         attendre("la langue corrigée") { moteur.message(2).langue == "fr" }
         assertNull(moteur.traduction(2))
@@ -268,7 +276,7 @@ class TraductionTest {
 
     @Test
     fun `un message rediffusé en direct (langue corrigée) remplace l'ancien`() {
-        val moteur = charge()
+        val moteur = charge(manuel())
         sur { moteur.premierPlan(true) }
         attendre("l'abonnement") { identifiant != null && moteur.cable.etat == Cable.Etat.ABONNE }
         val corrige = JSONObject(messages[1]).put("locale", "fr")
@@ -281,16 +289,56 @@ class TraductionTest {
     // -------------------------------------------------- toujours traduire --
 
     @Test
-    fun `Toujours traduire, gardé par site, traduit tout ce qui arrive`() {
+    fun `par défaut le fil arrive traduit, coupé les originaux, gardé par site`() {
         val stockage = StockageFichier(dossier.root, "pk_test").apply { jeton = "jeton-1" }
         val moteur = charge(stockage)
+        assertTrue("actif sans rien d'enregistré", moteur.etat.value.toujoursTraduire)
+        assertTrue(moteur.proposeTraduction())
+        attendre("le fil traduit") { moteur.affiche(2) == "Traduction 2" && moteur.affiche(3) == "Traduction 3" }
+        assertEquals(
+            "du plus récent au plus ancien",
+            listOf("/v1/widget/conversation/messages/3/translation", "/v1/widget/conversation/messages/2/translation"),
+            traductions.map { it.path },
+        )
+        // Ni le message en français, ni ceux du visiteur.
+        assertEquals("Bonne journée", moteur.affiche(4))
+        assertEquals("Bonjour", moteur.affiche(1))
+
+        // Coupé : on relit les originaux, et c'est enregistré.
+        sur { moteur.toujoursTraduire(false) }
         assertFalse(moteur.etat.value.toujoursTraduire)
+        assertFalse(StockageFichier(dossier.root, "pk_test").toujoursTraduire)
+        assertEquals("Hi! Your order shipped this morning.", moteur.affiche(2))
+        assertEquals(EtatTraduction.Faite("Traduction 3", "en", original = true), moteur.traduction(3))
+        assertTrue("le bouton reste, pour réactiver", moteur.proposeTraduction())
+
+        // Réactivé : déjà traduits, affichés traduits sans nouvel appel.
+        sur { moteur.toujoursTraduire(true) }
+        assertEquals("Traduction 2", moteur.affiche(2))
+        assertEquals("Traduction 3", moteur.affiche(3))
+        assertEquals(2, traductions.size)
+
+        // Coupé, gardé d'un lancement à l'autre et après un reset ; pas pour
+        // un autre site (actif par défaut).
+        sur { moteur.toujoursTraduire(false) }
+        sur { moteur.oublier(identite = true) }
+        assertTrue("la mémoire des traductions part avec la conversation", moteur.etat.value.traductions.isEmpty())
+        assertFalse(moteur.etat.value.toujoursTraduire)
+        assertFalse(StockageFichier(dossier.root, "pk_test").toujoursTraduire)
+        assertNull(StockageFichier(dossier.root, "pk_test").jeton)
+        assertTrue(StockageFichier(dossier.root, "pk_autre").toujoursTraduire)
+    }
+
+    @Test
+    fun `coupé puis réactivé, les traductions qui manquent sont demandées`() {
+        val moteur = charge(manuel())
+        assertFalse(moteur.etat.value.toujoursTraduire)
+        assertTrue("coupé : rien ne se traduit tout seul", moteur.etat.value.traductions.isEmpty())
         sur { moteur.traduire(moteur.message(2)) }
         attendre("la première traduction") { moteur.affiche(2) == "Traduction 2" }
         sur { moteur.basculerOriginal(moteur.message(2)) }
 
         sur { moteur.toujoursTraduire(true) }
-        assertTrue(stockage.toujoursTraduire)
         assertEquals("déjà traduit : affiché traduit, sans appel", "Traduction 2", moteur.affiche(2))
         attendre("le reste traduit") { moteur.affiche(3) == "Traduction 3" }
         assertEquals(
@@ -298,38 +346,44 @@ class TraductionTest {
             traductions.map { it.path },
         )
         assertEquals("Bonne journée", moteur.affiche(4))
+    }
 
-        // Coupé : on relit les originaux.
-        sur { moteur.toujoursTraduire(false) }
-        assertFalse(stockage.toujoursTraduire)
-        assertEquals("Hi! Your order shipped this morning.", moteur.affiche(2))
-        assertEquals(EtatTraduction.Faite("Traduction 3", "en", original = true), moteur.traduction(3))
-
-        // Gardé d'un lancement à l'autre et après un reset ; pas pour un autre site.
+    @Test
+    fun `réactivé, une traduction en erreur se redemande`() {
+        statutTraduction = 503
+        val moteur = charge(manuel())
+        sur { moteur.traduire(moteur.message(2)) }
+        attendre("l'erreur") { moteur.traduction(2) == EtatTraduction.Echec }
+        statutTraduction = 200
         sur { moteur.toujoursTraduire(true) }
-        sur { moteur.oublier(identite = true) }
-        assertTrue("la mémoire des traductions part avec la conversation", moteur.etat.value.traductions.isEmpty())
-        assertTrue(moteur.etat.value.toujoursTraduire)
-        assertTrue(StockageFichier(dossier.root, "pk_test").toujoursTraduire)
-        assertNull(StockageFichier(dossier.root, "pk_test").jeton)
-        assertFalse(StockageFichier(dossier.root, "pk_autre").toujoursTraduire)
+        attendre("tout traduit") { moteur.affiche(2) == "Traduction 2" && moteur.affiche(3) == "Traduction 3" }
     }
 
     @Test
-    fun `Toujours traduire déjà actif, le fil arrive traduit`() {
-        val moteur = charge(StockageMemoire().apply { jeton = "jeton-1"; toujoursTraduire = true })
-        assertTrue(moteur.proposeTraduction())
-        attendre("le fil traduit") { moteur.affiche(2) == "Traduction 2" && moteur.affiche(3) == "Traduction 3" }
-        assertEquals(2, traductions.size)
+    fun `coupé pendant la traduction, l'original reste affiché`() {
+        retardTraduction = 400
+        val moteur = charge()
+        attendre("la première demande partie") { traductions.size == 1 }
+        sur { moteur.toujoursTraduire(false) }
+        assertTrue("plus rien en cours : le lien Traduire revient", moteur.etat.value.traductions.isEmpty())
+        attendre("la réponse arrivée") { moteur.traduction(3) != null }
+        assertEquals(EtatTraduction.Faite("Traduction 3", "en", original = true), moteur.traduction(3))
+        assertEquals("Anything else?", moteur.affiche(3))
+        Thread.sleep(600)
+        assertEquals("l'autre n'est jamais demandée", 1, traductions.size)
+        assertNull(moteur.traduction(2))
     }
 
     @Test
-    fun `le menu n'est proposé que s'il sert`() {
+    fun `le bouton n'est montré que s'il sert`() {
         val etat = EtatChat(messages = listOf(Message(1, Expediteur.EQUIPE, null, "Bonjour", emptyList(), 0, langue = "fr")))
+        val anglais = Message(2, Expediteur.EQUIPE, null, "Hello", emptyList(), 1, langue = "en")
         val moteur = moteur()
         assertFalse(moteur.proposeTraduction(etat))
-        assertTrue(moteur.proposeTraduction(etat.copy(toujoursTraduire = true)))
-        assertTrue(moteur.proposeTraduction(etat.copy(messages = etat.messages + Message(2, Expediteur.EQUIPE, null, "Hello", emptyList(), 1, langue = "en"))))
+        assertFalse("actif, mais rien à traduire", moteur.proposeTraduction(etat.copy(toujoursTraduire = true)))
+        assertFalse("des emoji seuls", moteur.proposeTraduction(etat.copy(messages = etat.messages + anglais.copy(texte = "👍"))))
+        assertTrue(moteur.proposeTraduction(etat.copy(messages = etat.messages + anglais)))
+        assertTrue(moteur.proposeTraduction(etat.copy(toujoursTraduire = false, messages = etat.messages + anglais)))
     }
 
     // ------------------------------------------------- les noms de langue --
@@ -348,7 +402,7 @@ class TraductionTest {
         assertEquals("Traduit (QQQ)", RegleTraduction.traduitDe("qqq", Textes("fr")))
         for (langue in Textes.LANGUES) {
             val textes = Textes(langue)
-            for (cle in listOf("traduire", "traduction", "voir_original", "voir_traduction", "trad_erreur", "reessayer", "toujours", "options_trad")) {
+            for (cle in listOf("traduire", "traduction", "voir_original", "voir_traduction", "trad_erreur", "reessayer", "toujours")) {
                 assertTrue("$langue.$cle", textes.t(cle) != cle)
                 // Une langue sans le texte retomberait sur le français.
                 if (langue != "fr") assertTrue("$langue.$cle", textes.t(cle) != Textes("fr").t(cle))

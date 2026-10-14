@@ -5,9 +5,10 @@ import java.util.Locale
 // La traduction des messages de l'équipe, comme dans widget/widget.js : un
 // message écrit dans une autre langue que celle de la bulle porte un lien
 // « Traduire » ; traduit, il montre le texte dans la langue de la bulle et
-// « Traduit de l’anglais · Voir l’original ». « Toujours traduire » (menu de
-// l'en-tête, gardé par site sur l'appareil) les traduit dès leur arrivée.
-// L'état vit dans le Moteur ; ici, les règles.
+// « Traduit de l’anglais · Voir l’original ». « Toujours traduire » (le
+// bouton bascule de l'en-tête, gardé par site sur l'appareil, actif par
+// défaut) les traduit dès leur arrivée. L'état vit dans le Moteur ; ici, les
+// règles.
 
 // Où en est la traduction d'un message.
 internal sealed interface EtatTraduction {
