@@ -26,11 +26,11 @@ class ProtocoleTest {
 
     @Test
     fun `l'adresse du WebSocket porte le jeton, le client et l'app`() {
-        val url = Protocole.adresse("https://api.heyhooky.com", "jeton+/=", "hooky-android/1.0.0", "com.app 2.0 (3)")
+        val url = Protocole.adresse("https://api.heyhooky.com", "jeton+/=", "hooky-android/1.0.1", "com.app 2.0 (3)")
         assertEquals("api.heyhooky.com", url.host)
         assertEquals("/cable", url.encodedPath)
         assertEquals("jeton+/=", url.queryParameter("conversation_token"))
-        assertEquals("hooky-android/1.0.0", url.queryParameter("client"))
+        assertEquals("hooky-android/1.0.1", url.queryParameter("client"))
         assertEquals("com.app 2.0 (3)", url.queryParameter("app"))
     }
 

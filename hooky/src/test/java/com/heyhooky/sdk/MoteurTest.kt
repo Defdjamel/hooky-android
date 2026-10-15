@@ -107,14 +107,14 @@ class MoteurTest {
     private fun json(statut: Int, corps: String) = MockResponse().setResponseCode(statut).setHeader("Content-Type", "application/json").setBody(corps)
 
     private fun moteur(stockage: Stockage = StockageMemoire()): Moteur {
-        val api = Api(serveur.url("/").toString(), OkHttpClient(), Identite("hooky-android/1.0.0", "com.exemple 2.0 (3)"))
+        val api = Api(serveur.url("/").toString(), OkHttpClient(), Identite("hooky-android/1.0.1", "com.exemple 2.0 (3)"))
         return Moteur(
             cleSite = "pk_test",
             api = api,
             stockage = stockage,
             portee = portee,
             textes = Textes("fr"),
-            identite = Identite("hooky-android/1.0.0", "com.exemple 2.0 (3)"),
+            identite = Identite("hooky-android/1.0.1", "com.exemple 2.0 (3)"),
             fuseau = "Europe/Paris",
             page = "android-app://com.exemple",
             reconnexion = Reconnexion(premier = 50, plafond = 200),
@@ -150,7 +150,7 @@ class MoteurTest {
         assertNull(moteur.etat.value.envoi)
 
         val ouverture = requetes.first { it.path == "/v1/widget/conversations" }
-        assertEquals("hooky-android/1.0.0", ouverture.getHeader("X-Hooky-Client"))
+        assertEquals("hooky-android/1.0.1", ouverture.getHeader("X-Hooky-Client"))
         assertEquals("com.exemple 2.0 (3)", ouverture.getHeader("X-Hooky-App"))
 
         // Le WebSocket s'ouvre avec le jeton, le client et l'app dans l'adresse,
@@ -158,8 +158,8 @@ class MoteurTest {
         attendre("l'abonnement") { moteur.cable.etat == Cable.Etat.ABONNE }
         val cable = requetes.first { it.path!!.startsWith("/cable") }
         assertTrue(cable.path!!.contains("conversation_token=jeton-1"))
-        assertTrue(cable.path!!.contains("client=hooky-android%2F1.0.0"))
-        assertEquals("hooky-android/1.0.0", cable.getHeader("X-Hooky-Client"))
+        assertTrue(cable.path!!.contains("client=hooky-android%2F1.0.1"))
+        assertEquals("hooky-android/1.0.1", cable.getHeader("X-Hooky-Client"))
         assertTrue(cable.getHeader("Sec-WebSocket-Protocol")!!.contains("actioncable-v1-json"))
     }
 

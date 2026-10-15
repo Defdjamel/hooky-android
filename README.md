@@ -32,12 +32,12 @@ then the dependency, in your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.heyhooky:hooky-android:1.0.0")
+    implementation("com.heyhooky:hooky-android:1.0.1")
 }
 ```
 
 In Groovy: `maven { url 'https://defdjamel.github.io/hooky-android' }` and
-`implementation 'com.heyhooky:hooky-android:1.0.0'`. Its own
+`implementation 'com.heyhooky:hooky-android:1.0.1'`. Its own
 dependencies (AndroidX, Compose, OkHttp, coroutines) come from `google()` and
 `mavenCentral()`.
 

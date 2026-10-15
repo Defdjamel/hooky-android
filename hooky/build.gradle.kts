@@ -1,7 +1,7 @@
 // La bibliothèque, servie par GitHub Pages depuis la branche « maven » du
 // dépôt public github.com/Defdjamel/hooky-android (ce dossier, à sa racine) :
 //   repositories { maven("https://defdjamel.github.io/hooky-android") }
-//   implementation("com.heyhooky:hooky-android:1.0.0")
+//   implementation("com.heyhooky:hooky-android:1.0.1")
 // `./gradlew :hooky:publishReleasePublicationToDepotRepository` écrit le dépôt
 // Maven dans build/depot-maven (l'AAR, ses sources, le POM et le module
 // Gradle), à recopier dans la branche « maven » (sdk/publier-maven.sh).
@@ -13,7 +13,7 @@ plugins {
 }
 
 // La version du SDK : publiée, et envoyée à l'API (X-Hooky-Client).
-val versionSdk = "1.0.0"
+val versionSdk = "1.0.1"
 
 // Les coordonnées publiées : com.heyhooky, à la version du SDK. Sur JitPack,
 // com.github.Defdjamel, à la version qu'il donne (le tag) dans $VERSION.

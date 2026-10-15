@@ -251,7 +251,7 @@ public object Hooky {
     // leur bulle. Réservé, d'où l'opt-in.
 
     /**
-     * The `X-Hooky-Client` value (`hooky-flutter/1.0.0`…), set before
+     * The `X-Hooky-Client` value (`hooky-flutter/1.0.1`…), set before
      * [configure]; `null` for the default `hooky-android/<version>`.
      */
     @HookyWrapperApi

@@ -62,7 +62,7 @@ class IdentifierTest {
     private fun json(statut: Int, corps: String) = MockResponse().setResponseCode(statut).setHeader("Content-Type", "application/json").setBody(corps)
 
     private fun moteur(stockage: Stockage = StockageMemoire()): Moteur {
-        val identite = Identite("hooky-android/1.0.0", "com.exemple 2.0 (3)")
+        val identite = Identite("hooky-android/1.0.1", "com.exemple 2.0 (3)")
         return Moteur(
             cleSite = "pk_test",
             api = Api(serveur.url("/").toString(), OkHttpClient(), identite),
@@ -136,7 +136,7 @@ class IdentifierTest {
         assertEquals("un seul appel pour trois changements dans la seconde", 1, patchs().size)
         val (requete, texte) = patchs().single()
         assertEquals("Bearer jeton-1", requete.getHeader("Authorization"))
-        assertEquals("hooky-android/1.0.0", requete.getHeader("X-Hooky-Client"))
+        assertEquals("hooky-android/1.0.1", requete.getHeader("X-Hooky-Client"))
         val corps = JSONObject(texte)
         assertEquals("Lou", corps.getString("visitor_name"))
         assertEquals("lou@exemple.fr", corps.getString("visitor_email"))

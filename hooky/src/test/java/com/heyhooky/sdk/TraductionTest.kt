@@ -111,7 +111,7 @@ class TraductionTest {
 
     private fun json(statut: Int, corps: String) = MockResponse().setResponseCode(statut).setHeader("Content-Type", "application/json").setBody(corps)
 
-    private fun api() = Api(serveur.url("/").toString(), OkHttpClient(), Identite("hooky-android/1.0.0", "com.exemple 2.0 (3)"))
+    private fun api() = Api(serveur.url("/").toString(), OkHttpClient(), Identite("hooky-android/1.0.1", "com.exemple 2.0 (3)"))
 
     private fun moteur(stockage: Stockage = StockageMemoire().apply { jeton = "jeton-1" }, traduction: Boolean = true): Moteur =
         Moteur(
@@ -120,7 +120,7 @@ class TraductionTest {
             stockage = stockage,
             portee = portee,
             textes = Textes("fr"),
-            identite = Identite("hooky-android/1.0.0", "com.exemple 2.0 (3)"),
+            identite = Identite("hooky-android/1.0.1", "com.exemple 2.0 (3)"),
             fuseau = "Europe/Paris",
             page = null,
             traductionActive = traduction,
