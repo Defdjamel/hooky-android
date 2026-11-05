@@ -192,6 +192,11 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
             }
             override fun traduire(message: Message) = moteur.traduire(message)
             override fun basculerOriginal(message: Message) = moteur.basculerOriginal(message)
+            override fun choisir(message: Message, option: ChoixRapide) = moteur.agent.choisir(message, option)
+            override fun ficheOuverte(url: String) = moteur.agent.ficheOuverte(url)
+            override fun envoyerEmailPassage(email: String) = moteur.agent.envoyerEmail(email)
+            override fun emailPassageModifie() = moteur.agent.emailModifie()
+            override fun plusTard() = moteur.agent.plusTard()
         }
     }
 
@@ -221,7 +226,9 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
 
         val liste = rememberLazyListState()
         // Un nouveau message en bas : on y descend si l'on y était déjà (ou
-        // si c'est le nôtre).
+        // si c'est le nôtre). Le fil est à l'envers (le bas en premier) : une
+        // réponse de l'agent qui grandit pendant sa révélation reste en vue
+        // si l'on était en bas, et ne déplace rien si l'on est remonté lire.
         val dernier = lignes.lastOrNull()
         LaunchedEffect(dernier?.cle, etat.envoi?.debut) {
             if (liste.firstVisibleItemIndex <= 3 || etat.envoi != null) liste.animateScrollToItem(0)
@@ -239,6 +246,9 @@ internal fun EcranConversation(moteur: Moteur, fermer: () -> Unit) {
                 }
             }
         }
+
+        // L'agent IA : la mention, puis « Parler à un humain ».
+        BarreAgent(etat, moteur.agent::parlerAUnHumain)
 
         Saisie(
             valeur = saisie,

@@ -36,6 +36,11 @@ internal data class EtatChat(
     // que le visiteur ne l'a pas coupé).
     val traductions: Map<Long, EtatTraduction> = emptyMap(),
     val toujoursTraduire: Boolean = true,
+    // L'agent IA (Agent.kt) : « Parler à un humain » en route ou raté, la
+    // carte qui demande l'e-mail, la réponse en cours de révélation.
+    val passage: EtatPassage? = null,
+    val emailPassage: EtatEmailPassage? = null,
+    val revelation: Revelation? = null,
 ) {
     // Le message en route est-il déjà arrivé par Action Cable avant la
     // réponse de l'API ? Alors on ne l'affiche pas deux fois.
@@ -55,9 +60,9 @@ internal data class EtatChat(
 // (le fil principal dans l'app) ; Hooky en garde une seule instance.
 internal class Moteur(
     val cleSite: String,
-    private val api: Api,
+    internal val api: Api,
     private val stockage: Stockage,
-    private val portee: CoroutineScope,
+    internal val portee: CoroutineScope,
     val textes: Textes,
     private val identite: Identite,
     private val fuseau: String?,
@@ -65,14 +70,14 @@ internal class Moteur(
     reconnexion: Reconnexion = Reconnexion(),
     private val horloge: () -> Long = System::currentTimeMillis,
     // « Samsung SM-S918B · Android 15 ».
-    private val appareil: String? = null,
+    internal val appareil: String? = null,
     // Plusieurs changements du profil en moins d'une seconde : un seul PATCH.
     private val delaiProfil: Long = 1_000,
     // Hooky.configure(translation = false) : ni lien ni bouton de traduction,
     // et rien ne se traduit.
     val traductionActive: Boolean = true,
 ) {
-    private val _etat = MutableStateFlow(EtatChat(toujoursTraduire = stockage.toujoursTraduire))
+    internal val _etat = MutableStateFlow(EtatChat(toujoursTraduire = stockage.toujoursTraduire))
     val etat: StateFlow<EtatChat> = _etat.asStateFlow()
 
     private val _nonLus = MutableStateFlow(0)
@@ -95,7 +100,7 @@ internal class Moteur(
     // part qu'une fois).
     var profilAEnvoyer = Profil()
         private set
-    private var profilConnu = Profil()
+    internal var profilConnu = Profil()
     private var envoiProfil: Job? = null
     private var profilPlanifie = false
 
@@ -109,9 +114,12 @@ internal class Moteur(
     var prenomSaisi: String = ""
     var emailSaisi: String = ""
 
-    private var jeton: String? = stockage.jeton
-    private var premierPlan = false
-    private var ouvert = false
+    internal var jeton: String? = stockage.jeton
+        private set
+    internal var premierPlan = false
+        private set
+    internal var ouvert = false
+        private set
     private var luEnvoye: Long? = null
     private var dernierRafraichi = 0L
     private var chargementSite: Job? = null
@@ -134,6 +142,11 @@ internal class Moteur(
     val aConversation: Boolean get() = jeton != null
 
     val adresseApi: String get() = api.base
+
+    // Réduire les animations ou TalkBack : les réponses de l'agent
+    // s'affichent d'un coup (voir Agent.kt). Remplaçable par les tests.
+    var revelationPermise: () -> Boolean = { true }
+    internal val agent = Agent(this)
 
     // Hooky.track : sans attendre, sans erreur.
     fun suivre(nom: String, valeur: Double?, proprietes: Map<String, Any?>) {
@@ -170,6 +183,7 @@ internal class Moteur(
             verifierLiens()
             viderProfil()
         } else {
+            agent.terminerRevelation()
             cable.fermer()
             stockage.brouillon = brouillon
         }
@@ -183,6 +197,7 @@ internal class Moteur(
             marquerLu()
             verifierLiens()
         } else {
+            agent.terminerRevelation()
             stockage.brouillon = brouillon
         }
     }
@@ -285,10 +300,17 @@ internal class Moteur(
 
     // Le texte et les fichiers partent ensemble. Rend vrai si c'est parti ;
     // sinon l'erreur est dans l'état et l'écran remet le brouillon.
-    suspend fun envoyer(texte: String, fichiers: List<FichierChoisi>, nom: String? = null, email: String? = null): Boolean {
+    suspend fun envoyer(
+        texte: String,
+        fichiers: List<FichierChoisi>,
+        nom: String? = null,
+        email: String? = null,
+        choix: Pair<Long, String>? = null,
+    ): Boolean {
         val propre = texte.trim()
         if (_etat.value.envoi != null || (propre.isEmpty() && fichiers.isEmpty())) return false
         val premier = jeton == null
+        agent.terminerRevelation()
         val envois = fichiers.map { it.versEnvoi() }
         _etat.update { it.copy(erreur = null, envoi = EnvoiEnCours(propre, fichiers, if (fichiers.isEmpty()) null else 0f, horloge())) }
         val progres: (Float) -> Unit = { part ->
@@ -325,14 +347,18 @@ internal class Moteur(
                 stockage.luJusqua = fil.messages.filter { it.expediteur == Expediteur.EQUIPE }.maxOfOrNull { it.id } ?: 0
                 profilConnu = Profil(nomEnvoye?.takeIf { it.isNotEmpty() }, emailEnvoye?.takeIf { it.isNotEmpty() }, compte, extra)
                 retenu = null
+                agent.noterAReveler(fil.messages)
                 charger(fil, remplacer = true)
                 brancher()
             } else {
-                val message = api.envoyer(jeton!!, propre, envois, progres)
+                val message = if (choix != null) api.choisir(jeton!!, choix.first, choix.second) else api.envoyer(jeton!!, propre, envois, progres)
+                agent.noterAReveler(listOf(message))
                 fusionner(listOf(message))
             }
-            brouillon = ""
-            stockage.brouillon = null
+            if (choix == null) {
+                brouillon = ""
+                stockage.brouillon = null
+            }
             _etat.update { it.copy(envoi = null) }
             viderProfil()
             true
@@ -564,6 +590,7 @@ internal class Moteur(
         stockage.effacer()
         traducteur?.cancel()
         fileTraductions.clear()
+        agent.oublier()
         // « Toujours traduire » est un réglage de l'appareil : il reste.
         _etat.update { EtatChat(site = it.site, toujoursTraduire = it.toujoursTraduire) }
         _nonLus.value = 0
@@ -610,7 +637,7 @@ internal class Moteur(
     }
 
     // Un message déjà connu est remplacé : relu, il apporte des liens neufs.
-    private fun fusionner(arrives: List<Message>, remplacer: Boolean = false) {
+    internal fun fusionner(arrives: List<Message>, remplacer: Boolean = false) {
         _etat.update { etat ->
             val index = LinkedHashMap<Long, Message>()
             if (!remplacer) etat.messages.forEach { index[it.id] = it }
@@ -620,6 +647,7 @@ internal class Moteur(
         compterNonLus()
         marquerLu()
         traduireLesNouveaux()
+        agent.revelerLesNotes()
     }
 
     private fun compterNonLus() {
@@ -627,9 +655,12 @@ internal class Moteur(
         _nonLus.value = _etat.value.messages.count { it.expediteur == Expediteur.EQUIPE && it.id > lu }
     }
 
-    private fun recevoir(evenement: EvenementConversation) {
+    internal fun recevoir(evenement: EvenementConversation) {
         when (evenement) {
             is EvenementConversation.NouveauMessage -> {
+                // Un autre message pendant une révélation : elle se termine d'un coup.
+                if (_etat.value.revelation?.id != evenement.message.id) agent.terminerRevelation()
+                agent.noterAReveler(listOf(evenement.message))
                 if (evenement.message.expediteur == Expediteur.EQUIPE) _etat.update { it.copy(equipeEcrit = null) }
                 fusionner(listOf(evenement.message.copy(recuLe = horloge())))
                 // Un message du visiteur rouvre une conversation fermée.
@@ -648,6 +679,8 @@ internal class Moteur(
             is EvenementConversation.Lu -> if (evenement.expediteur == Expediteur.EQUIPE) {
                 _etat.update { it.copy(luParEquipe = evenement.le) }
             }
+            // L'équipe qui répond n'a pas besoin de l'e-mail : elle est là.
+            is EvenementConversation.Passage -> agent.passeAUnHumain(demanderEmail = evenement.raison != "team")
         }
     }
 

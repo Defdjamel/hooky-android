@@ -32,12 +32,12 @@ then the dependency, in your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.heyhooky:hooky-android:1.0.1")
+    implementation("com.heyhooky:hooky-android:1.1.0")
 }
 ```
 
 In Groovy: `maven { url 'https://defdjamel.github.io/hooky-android' }` and
-`implementation 'com.heyhooky:hooky-android:1.0.1'`. Its own
+`implementation 'com.heyhooky:hooky-android:1.1.0'`. Its own
 dependencies (AndroidX, Compose, OkHttp, coroutines) come from `google()` and
 `mavenCentral()`.
 
@@ -165,6 +165,34 @@ Hooky.reset()                                            // when the user signs 
   messages are never translated. It needs a Hooky server that tells each
   message's language (with an older one, no link appears); turn it off with
   `Hooky.configure(context, "YOUR_SITE_KEY", translation = false)`.
+
+## AI agent
+
+When the site's AI agent is on (Hooky › AI agent, paid plans), the native
+conversation shows it like the web bubble, with nothing to set up in your app:
+
+- **Disclosure.** Until the agent has replied, a notice above the input says
+  "You're chatting with an AI assistant. A human can take over." Its messages
+  carry an **AI assistant** label next to their author.
+- **Talk to a human.** Once the agent has replied, a "Talk to a human" button
+  replaces the notice: the conversation goes to your team (notified then, not
+  before). If the bubble doesn't know the visitor's email (neither `identify`
+  nor the form gave it), a small card asks for it so they get the team's reply
+  if they leave ("Later" closes it). The same happens when the agent hands
+  over by itself.
+- **Rich replies.** Under its text, the agent can show up to 3 product cards
+  (photo, name, price, availability, **View**), stacked, a link button to a page
+  of the site, and up to 4 quick replies, tappable on the last message only; a
+  tap sends the choice as the visitor's message. Opening a product counts an
+  `agent_product_click` event (with its `url`) in the site's stats.
+- **Progressive reveal.** A reply arriving live appears word by word, then
+  each card, the link and the quick replies; the thread stays at the bottom if
+  the visitor was there, and doesn't move if they scrolled up to read. With
+  **Remove animations** (animator duration scale off) or TalkBack on, replies
+  appear at once, and TalkBack always reads the whole message, once.
+
+An older Hooky server, or an unknown kind of content from a newer one, is
+simply ignored: the message's text always shows.
 
 ## What the SDK adds to your app
 

@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
+import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.compose.runtime.mutableStateOf
@@ -123,6 +125,9 @@ public object Hooky {
             appareil = Appareil.actuel(),
             traductionActive = translation,
         )
+        // « Supprimer les animations » ou TalkBack : les réponses de l'agent IA
+        // s'affichent d'un coup, sans révélation mot par mot.
+        nouveau.revelationPermise = { revelationPermise(application) }
         // Avant le démarrage : un autre compte que celui de la conversation
         // enregistrée repart d'une page blanche.
         nouveau.identifier(nom, email, utilisateur, donnees)
@@ -296,6 +301,16 @@ public object Hooky {
 
     // « com.exemple.app 2.3.1 (231) » : pour l'équipe, comme le navigateur
     // pour la bulle web.
+    private fun revelationPermise(context: Context): Boolean {
+        val echelle = try {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        } catch (_: Exception) {
+            1f
+        }
+        val accessibilite = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        return echelle > 0f && accessibilite?.isTouchExplorationEnabled != true
+    }
+
     private fun descriptionApp(context: Context): String = try {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         "${context.packageName} ${info.versionName ?: "?"} (${PackageInfoCompat.getLongVersionCode(info)})"

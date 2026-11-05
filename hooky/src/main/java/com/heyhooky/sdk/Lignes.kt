@@ -6,14 +6,16 @@ import java.util.Calendar
 // Le fil mis en lignes, comme threadNodes() dans widget.js : le jour
 // au-dessus d'une série, le nom de l'auteur de l'équipe, les messages
 // groupés (même expéditeur, même auteur, moins de 5 minutes d'écart), l'heure
-// sous le dernier d'une série, « Lu » sous le dernier message du visiteur.
+// sous le dernier d'une série, « Lu » sous le dernier message du visiteur ;
+// l'agent IA : son étiquette, ses choix rapides (dernier message seulement),
+// sa réponse en cours de révélation, la carte qui demande l'e-mail.
 // Fonction pure : l'écran ne fait que dessiner ces lignes.
 internal sealed interface Ligne {
     val cle: String
 
     data object Plus : Ligne { override val cle = "plus" }
     data class Jour(val texte: String, override val cle: String) : Ligne
-    data class Auteur(val nom: String, override val cle: String) : Ligne
+    data class Auteur(val nom: String, override val cle: String, val bot: Boolean = false) : Ligne
     // traduisible : un message de l'équipe dans une autre langue (le lien
     // « Traduire » dessous) ; traduction : où il en est.
     data class Bulle(
@@ -23,6 +25,10 @@ internal sealed interface Ligne {
         val emoji: Int,
         val traduisible: Boolean = false,
         val traduction: EtatTraduction? = null,
+        // L'agent IA : ses choix rapides se touchent-ils, et où en est sa
+        // révélation (null : tout est montré).
+        val choix: Boolean = false,
+        val revelation: Revelation? = null,
     ) : Ligne {
         override val cle = "m" + message.id
         // Le texte affiché : la traduction, sauf si le visiteur relit l'original.
@@ -35,6 +41,7 @@ internal sealed interface Ligne {
     data class Intro(val texte: String) : Ligne { override val cle = "intro" }
     data object Carte : Ligne { override val cle = "carte" }
     data object Fermee : Ligne { override val cle = "fermee" }
+    data class EmailPassage(val etat: EtatEmailPassage) : Ligne { override val cle = "email-passage" }
 }
 
 internal object MiseEnLignes {
@@ -75,11 +82,15 @@ internal object MiseEnLignes {
 
             if (nouveauJour) sortie += Ligne.Jour(jour(message.creeLe), "j" + debutDuJour(message.creeLe))
             if (message.expediteur == Expediteur.EQUIPE && !suite && message.auteur != null) {
-                sortie += Ligne.Auteur(message.auteur, "a" + message.id)
+                sortie += Ligne.Auteur(message.auteur, "a" + message.id + if (message.bot) "ia" else "", message.bot)
             }
-            val emoji = if (message.pieces.isEmpty()) nombreEmoji(message.texte) else 0
+            val emoji = if (message.pieces.isEmpty() && message.blocs.isEmpty()) nombreEmoji(message.texte) else 0
             val traduire = traduisible(message)
-            sortie += Ligne.Bulle(message, suite, fin, emoji, traduire, if (traduire) etat.traductions[message.id] else null)
+            sortie += Ligne.Bulle(
+                message, suite, fin, emoji, traduire, if (traduire) etat.traductions[message.id] else null,
+                choix = etat.choixVisibles(message),
+                revelation = etat.revelation?.takeIf { it.id == message.id },
+            )
             if (fin) {
                 val texte = heure(message.creeLe) + if (message === dernierVisiteur && lu) " · " + textes.t("lu") else ""
                 sortie += Ligne.Heure(texte, message.expediteur == Expediteur.VISITEUR, "h" + message.id)
@@ -87,13 +98,14 @@ internal object MiseEnLignes {
         }
 
         etat.envoiVisible?.let { sortie += Ligne.Envoi(it) }
+        etat.emailPassage?.let { sortie += Ligne.EmailPassage(it) }
         etat.equipeEcrit?.let { sortie += Ligne.Frappe(textes.t("ecrit", "nom" to it)) }
         if (etat.conversation?.fermee == true && etat.envoiVisible == null) sortie += Ligne.Fermee
         return sortie
     }
 
     private fun serie(a: Message?, b: Message?): Boolean =
-        a != null && b != null && a.expediteur == b.expediteur && a.auteur == b.auteur && b.creeLe - a.creeLe < SERIE
+        a != null && b != null && a.expediteur == b.expediteur && a.auteur == b.auteur && a.bot == b.bot && b.creeLe - a.creeLe < SERIE
 
     fun memeJour(a: Long, b: Long): Boolean = debutDuJour(a) == debutDuJour(b)
 

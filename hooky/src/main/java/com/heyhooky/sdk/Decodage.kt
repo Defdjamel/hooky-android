@@ -18,6 +18,7 @@ internal object Decodage {
             couleur = site.chaine("color") ?: "#8B6CFF",
             position = site.chaine("position") ?: "right",
             accueil = site.chaine("greeting")?.takeIf { it.isNotBlank() },
+            agent = site.booleen("agent"),
         )
     }
 
@@ -28,6 +29,8 @@ internal object Decodage {
         fermee = json.optBoolean("closed", false),
         luParEquipe = date(json.chaine("team_read_at")),
         creeLe = date(json.chaine("created_at")),
+        agent = json.booleen("agent"),
+        passeeAUnHumain = json.booleen("handed_off"),
     )
 
     fun fil(json: JSONObject, recuLe: Long = System.currentTimeMillis()): Fil = Fil(
@@ -45,6 +48,7 @@ internal object Decodage {
         val id = json.optLong("id", -1)
         if (id < 0) return null
         val pieces = json.optJSONArray("attachments")
+        val bot = json.booleen("bot")
         return Message(
             id = id,
             expediteur = expediteur(json.chaine("sender")),
@@ -54,8 +58,46 @@ internal object Decodage {
             creeLe = date(json.chaine("created_at")) ?: recuLe,
             recuLe = recuLe,
             langue = json.chaine("locale")?.takeIf { it.isNotBlank() },
+            bot = bot,
+            // Seuls les messages de l'agent portent des blocs.
+            blocs = if (bot) blocs(json.opt("blocks")) else emptyList(),
+            reponseA = (json.opt("reply_to_id") as? Number)?.toLong(),
+            choix = json.chaine("choice")?.takeIf { it.isNotBlank() },
         )
     }
+
+    // Les blocs d'un message de l'agent : un type inconnu, un bloc mal formé
+    // ou un champ inattendu sont ignorés ; le message se lit toujours.
+    fun blocs(valeur: Any?): List<Bloc> {
+        val liste = valeur as? JSONArray ?: return emptyList()
+        return (0 until liste.length()).mapNotNull { i -> (liste.opt(i) as? JSONObject)?.let(::bloc) }
+    }
+
+    fun bloc(json: JSONObject): Bloc? = when (json.chaine("type")) {
+        "products" -> objets(json.opt("items")).mapNotNull(::fiche).take(3).takeIf { it.isNotEmpty() }?.let { Bloc.Produits(it) }
+        "link" -> adresseWeb(json.chaine("url"))?.let { Bloc.Lien(json.chaine("label")?.takeIf { l -> l.isNotBlank() }, it) }
+        "quick_replies" -> objets(json.opt("options")).mapNotNull { o ->
+            val id = o.chaine("id")
+            val libelle = o.opt("label") as? String
+            if (id == null || libelle.isNullOrEmpty()) null else ChoixRapide(id, libelle)
+        }.take(4).takeIf { it.isNotEmpty() }?.let { Bloc.Choix(it) }
+        else -> null
+    }
+
+    private fun fiche(json: JSONObject): FicheProduit? {
+        val nom = (json.opt("name") as? String)?.takeIf { it.isNotBlank() } ?: return null
+        fun texte(cle: String) = json.chaine(cle)?.trim()?.takeIf { it.isNotEmpty() && json.opt(cle) !is JSONObject && json.opt(cle) !is JSONArray }
+        return FicheProduit(nom, texte("price"), texte("availability"), adresseWeb(texte("url")), adresseWeb(texte("image_url")))
+    }
+
+    private fun objets(valeur: Any?): List<JSONObject> {
+        val liste = valeur as? JSONArray ?: return emptyList()
+        return (0 until liste.length()).mapNotNull { liste.opt(it) as? JSONObject }
+    }
+
+    // Une adresse web seulement (pas de javascript:…), comme adresse() de widget.js.
+    fun adresseWeb(texte: String?): String? =
+        texte?.trim()?.takeIf { Regex("^https?://[^\\s/]+", RegexOption.IGNORE_CASE).containsMatchIn(it) }
 
     // { "translation": { "message_id", "locale", "source_locale", "body" } }.
     fun traduction(json: JSONObject): Traduction? {
@@ -86,6 +128,7 @@ internal object Decodage {
         "message" -> json.optJSONObject("message")?.let(::message)?.let { EvenementConversation.NouveauMessage(it) }
         "typing" -> EvenementConversation.Ecrit(expediteur(json.chaine("sender")), json.chaine("author_name")?.takeIf { it.isNotBlank() })
         "read" -> EvenementConversation.Lu(expediteur(json.chaine("sender")), date(json.chaine("read_at")))
+        "handoff" -> EvenementConversation.Passage(json.chaine("reason"))
         else -> null
     }
 
@@ -119,6 +162,9 @@ internal object Decodage {
         }
         return millis
     }
+
+    // Un vrai booléen seulement : « oui », 1 ou null valent faux.
+    private fun JSONObject.booleen(cle: String): Boolean = opt(cle) == true
 
     // optString rend « null » (la chaîne) pour un JSON null : on n'en veut pas.
     private fun JSONObject.chaine(cle: String): String? =

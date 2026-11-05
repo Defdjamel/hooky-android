@@ -131,6 +131,28 @@ internal class Api(
         return reponse.optJSONObject("message")?.let { Decodage.message(it) } ?: throw ErreurApi(500, "invalid_response")
     }
 
+    // Un choix rapide de l'agent IA touché : le serveur écrit lui-même son
+    // libellé comme texte du message.
+    suspend fun choisir(jeton: String, message: Long, choix: String): Message {
+        val requete = Request.Builder()
+            .url(adresse("v1/widget/conversation/messages"))
+            .header("Authorization", "Bearer $jeton")
+            .post(JSONObject().put("reply_to_id", message).put("choice", choix).toString().toRequestBody(JSON))
+            .build()
+        return json(requete).optJSONObject("message")?.let { Decodage.message(it) } ?: throw ErreurApi(500, "invalid_response")
+    }
+
+    // « Parler à un humain » : l'agent IA se tait, l'équipe est prévenue.
+    // Rend la conversation à jour.
+    suspend fun passerAUnHumain(jeton: String): Conversation {
+        val requete = Request.Builder()
+            .url(adresse("v1/widget/conversation/handoff"))
+            .header("Authorization", "Bearer $jeton")
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        return Decodage.conversation(json(requete).optJSONObject("conversation") ?: JSONObject())
+    }
+
     // La dernière page du fil, ou celle d'avant le message « avant ».
     suspend fun fil(jeton: String, avant: Long? = null): Fil {
         val url = adresse("v1/widget/conversation").newBuilder()

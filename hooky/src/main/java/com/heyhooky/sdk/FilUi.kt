@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -104,13 +105,15 @@ internal fun LigneFil(
             )
         }
 
-        is Ligne.Auteur -> Text(
-            ligne.nom,
-            color = palette.gris,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 6.dp, top = 10.dp, bottom = 3.dp),
-        )
+        is Ligne.Auteur -> Row(
+            Modifier.padding(start = 6.dp, top = 10.dp, bottom = 3.dp).semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(ligne.nom, color = palette.gris, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            // L'agent IA : « Assistant IA » près de son nom.
+            if (ligne.bot) EtiquetteIa(textes.t("assistant_ia"))
+        }
 
         is Ligne.Bulle -> MessageFil(ligne, largeurMax, actions)
 
@@ -139,6 +142,8 @@ internal fun LigneFil(
 
         Ligne.Carte -> CarteAccueil(actions)
 
+        is Ligne.EmailPassage -> CarteEmailPassage(ligne.etat, actions::envoyerEmailPassage, actions::emailPassageModifie, actions::plusTard)
+
         Ligne.Fermee -> Text(
             textes.t("ferme"),
             color = palette.gris,
@@ -163,6 +168,12 @@ internal interface ActionsFil {
     // « Traduire » (ou « Réessayer »), « Voir l’original » / « Voir la traduction ».
     fun traduire(message: Message) = Unit
     fun basculerOriginal(message: Message) = Unit
+    // L'agent IA : un choix rapide touché, une fiche ouverte, la carte de l'e-mail.
+    fun choisir(message: Message, option: ChoixRapide) = Unit
+    fun ficheOuverte(url: String) = Unit
+    fun envoyerEmailPassage(email: String) = Unit
+    fun emailPassageModifie() = Unit
+    fun plusTard() = Unit
 }
 
 @Composable
@@ -188,16 +199,35 @@ private fun MessageFil(ligne: Ligne.Bulle, largeurMax: Dp, actions: ActionsFil) 
                 surPartager = { actions.ouvrirFichier(piece, partager = true) },
             )
         }
-        if (message.texte.isNotEmpty()) {
+        val revelation = ligne.revelation
+        if (message.texte.isNotEmpty() && revelation?.motsMontres != 0) {
             if (ligne.emoji > 0) {
                 Text(message.texte, fontSize = if (ligne.emoji == 1) 48.sp else 38.sp, lineHeight = 52.sp, modifier = Modifier.padding(horizontal = 2.dp))
             } else {
                 // La langue du texte affiché, pour la voix de TalkBack.
                 val traduit = ligne.traduction is EtatTraduction.Faite && !ligne.traduction.original
-                BulleTexte(ligne.texte, visiteur, ligne.fin, largeurMax, langue = if (traduit) LocalTextes.current.langue else message.langue)
+                // Pendant la révélation, le texte grandit mot par mot ; TalkBack
+                // lit toujours le message entier, une fois.
+                BulleTexte(
+                    revelation?.texteMontre(ligne.texte) ?: ligne.texte,
+                    visiteur,
+                    ligne.fin,
+                    largeurMax,
+                    langue = if (traduit) LocalTextes.current.langue else message.langue,
+                    descriptionComplete = if (revelation != null) ligne.texte else null,
+                )
             }
         }
         if (ligne.traduisible) LigneTraduction(ligne, actions)
+        if (message.blocs.isNotEmpty() && (revelation?.texteFini != false)) {
+            BlocsAgent(
+                message,
+                choixVisibles = ligne.choix,
+                unitesMontrees = revelation?.unitesMontrees,
+                choisir = { actions.choisir(message, it) },
+                ficheOuverte = actions::ficheOuverte,
+            )
+        }
     }
 }
 
@@ -264,7 +294,14 @@ private fun LienTraduction(texte: String, action: () -> Unit) {
 // Une bulle de texte : l'encre pleine pour le visiteur, la carte bordée
 // (ombre dure) pour l'équipe ; la pointe sur le dernier d'une série.
 @Composable
-internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurMax: Dp, langue: String? = null) {
+internal fun BulleTexte(
+    texte: String,
+    visiteur: Boolean,
+    fin: Boolean,
+    largeurMax: Dp,
+    langue: String? = null,
+    descriptionComplete: String? = null,
+) {
     val palette = LocalPalette.current
     val forme = if (visiteur) {
         RoundedCornerShape(RAYON, RAYON, if (fin) POINTE else RAYON, RAYON)
@@ -281,7 +318,8 @@ internal fun BulleTexte(texte: String, visiteur: Boolean, fin: Boolean, largeurM
                 .padding(horizontal = 13.dp, vertical = 8.dp)
         }
     }
-    SelectionContainer(fond) {
+    val lu = if (descriptionComplete != null) fond.clearAndSetSemantics { contentDescription = descriptionComplete } else fond
+    SelectionContainer(lu) {
         Text(texteAvecLiens(texte, langue), color = couleurTexte, fontSize = 15.sp, lineHeight = 21.sp)
     }
 }
